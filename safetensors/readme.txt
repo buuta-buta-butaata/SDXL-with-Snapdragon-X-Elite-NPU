@@ -1,0 +1,1 @@
+.safetensors置き場
