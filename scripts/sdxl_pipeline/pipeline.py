@@ -1,4 +1,6 @@
 import time
+print("処理時間計測開始")
+start_time = time.perf_counter()
 
 import gc
 import os
@@ -91,8 +93,9 @@ class SDXLPipeline:
         self.config = sdxl_config
 
     def run(self):
-        print("処理時間計測開始")
-        start_time = time.perf_counter()
+        global start_time
+        # print("処理時間計測開始")
+        # start_time = time.perf_counter()
         
         print("=========================================")
         print("🚀 SDXL NPU パイプライン 起動")
