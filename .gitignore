@@ -4,8 +4,11 @@ __pycache__/
 
 *.log
 
+*.png
+
 *.onnx
 *.bin
+*.data
 *.safetensors
 tokenizer/
 tokenizer_2/

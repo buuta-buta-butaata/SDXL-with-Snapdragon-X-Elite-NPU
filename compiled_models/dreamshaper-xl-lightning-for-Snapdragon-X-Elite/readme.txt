@@ -1,12 +1,21 @@
 https://huggingface.co/Buuta/dreamshaper-xl-lightning-for-Snapdragon-X-Elite/tree/main
-上記からダウンロードしたものをここに置いてね
+上記からダウンロードしたモデルをここに置いてください
+
 次のディレクトリが必要
-text_encoder
-text_encoder_2
-tokenizer
-tokenizer_2
-unet
-vae_decoder
+- text_encoder
+- text_encoder_2
+- tokenizer
+- tokenizer_2
+- unet
+- vae_decoder
 
 今は使ってないから不要なもの
-vae_encoder
+- vae_encoder
+
+ダウンロード用のスクリプトも用意したので、そちらを利用してもOK
+このファイルと同じディレクトリにあるものを使います
+コマンドは以下の通り
+
+pip install -r requirements.txt
+python download.py
+
