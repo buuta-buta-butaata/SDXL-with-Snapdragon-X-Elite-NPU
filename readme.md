@@ -105,6 +105,63 @@ To view the available options (and their minimalist descriptions), run:
 image_gen.bat --help
 ```
 
+### 📋 Example Console Output
+
+Here is a real example of the console log when running the generation script. 
+
+*Note: Since the project was initially developed for personal use, the console status messages are output in Japanese.*
+
+```text
+(qai_hub) C:\Applications\AI\github\SDXL-with-Snapdragon-X-Elite-NPU>python scripts\sdxl_pipeline\run.py "lion"
+処理時間計測開始
+steps: 6
+=========================================
+🚀 SDXL NPU パイプライン 起動
+=========================================
+
+総経過時間: 1.692 秒
+--- Text Encoder 1 処理開始 ---
+--- Text Encoder 2 処理開始 ---
+--- Text Encoder 1 処理開始 ---
+--- Text Encoder 2 処理開始 ---
+
+総経過時間: 6.060 秒
+--- UNet 5分割モデルをNPUにロード中 (常駐駆動) ---
+  -> UNetすべてのロードが完了しました。
+seed: 3656647306
+
+--- デノイズループ開始 ---
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████| 6/6 [00:32<00:00,  5.42s/it]
+--- デノイズループ完了 ---
+
+総経過時間: 57.820 秒
+--- VAE Decoder 処理開始 ---
+
+総経過時間: 62.034 秒
+
+--- [最終工程] 後処理 ＆ 画像保存 ---
+🎨 完了！ 『output_sdxl_npu20260616000948.png』 が正常に保存されました。
+path: ./outputs\output_sdxl_npu20260616000948.png
+
+合計処理時間: 62.153 秒
+==================================================
+ 🛠️  MEMORY PROFILE REPORT
+==================================================
+ 👑 推論中のピークRAM: 7.72 GB
+==================================================
+```
+
+#### 🧭 Quick Log Translation Guide
+If you want to know what the Japanese console logs mean, here is a quick reference:
+* `🚀 SDXL NPU パイプライン 起動`: SDXL NPU Pipeline Started
+* `--- Text Encoder 1 処理開始 ---`: Text Encoder 1 Processing Started
+* `--- UNet 5分割モデルをNPUにロード中 ---`: Loading the 5-split UNet models into the NPU...
+* `UNetすべてのロードが完了しました。`: All UNet fragments successfully loaded.
+* `--- デノイズループ開始 ---`: Denoising Loop Started
+* `--- デノイズループ完了 ---`: Denoising Loop Completed
+* `合計処理時間: 62.153 秒`: Total elapsed time: 62.153 sec
+* `ピークRAM: 7.72 GB`: Peak RAM: 7.72 GB
+
 ## Technical Architecture: How It Works
 
 To achieve acceptable RAM usage and inference speed on the Snapdragon X Elite NPU, the model must be pre-compiled. 
