@@ -16,6 +16,6 @@ https://huggingface.co/Buuta/dreamshaper-xl-lightning-for-Snapdragon-X-Elite/tre
 このファイルと同じディレクトリにあるものを使います
 コマンドは以下の通り
 
-pip install -r requirements.txt
+pip install -r requirements_download.txt
 python download.py
 
