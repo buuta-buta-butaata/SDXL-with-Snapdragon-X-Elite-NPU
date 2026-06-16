@@ -28,6 +28,8 @@ This project serves as a Proof of Concept (PoC) to demonstrate the feasibility o
 * **OS**: Windows 11 (ARM64).
 * **RAM**: 16 GB or higher. 
   * *Note: Having at least 8 GB of free RAM at runtime is ideal. However, it will run as long as you have sufficient Virtual Memory (Pagefile) allocated (8 GB or more).*
+* **Storage**: At least **20 GB of free disk space** is highly recommended. 
+  * *Reason: You need to account for both the 7 GB compiled model files and the additional allocation required for the Windows Virtual Memory (Pagefile).*
 * **Python**: Python 3.13.x (ARM64 Native).
   * *Note: While it should theoretically run on Linux with minor script modifications, this repository currently only supports Windows.*
 
@@ -50,6 +52,8 @@ cd SDXL-with-Snapdragon-X-Elite-NPU
 
 #### 2. Download the Model
 You can download the pre-compiled models either via your browser or using the provided Python script.
+
+*⚠️ **Important Note on Downloading:** The total model size is around **7 GB**. Depending on your network speed, the download may take some time (expect **5+ minutes**). Please be patient while the script fetches the files.*
 
 ##### Method A: Via Web Browser
 1. Go to the Hugging Face repository: [dreamshaper-xl-lightning-for-Snapdragon-X-Elite](https://huggingface.co/Buuta/dreamshaper-xl-lightning-for-Snapdragon-X-Elite/tree/main)
