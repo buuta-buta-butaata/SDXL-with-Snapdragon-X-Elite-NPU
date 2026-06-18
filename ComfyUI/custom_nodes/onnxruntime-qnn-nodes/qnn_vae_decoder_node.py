@@ -7,6 +7,7 @@ import folder_paths
 from . import qnn_ep_helper as qnn
 from . import common_utils as utils
 from .qnn_unet_node import QNNUNetLoader
+from .qnn_base_path_node import QNNBasePathLoader
 
 # =====================================================================
 # 3. QNN VAE Decoder Loader & ラッパー
@@ -14,21 +15,27 @@ from .qnn_unet_node import QNNUNetLoader
 class QNNVAELoader:
     @classmethod
     def INPUT_TYPES(s):
-        vae_list = folder_paths.get_filename_list("vae")
-        folders = sorted(list(set([os.path.dirname(f) for f in vae_list if os.path.dirname(f) != ""])))
-        if not folders: folders = ["フォルダを作成してください"]
-        return {"required": {"folder_name": (folders,)}}
+        return {
+            "required": {
+                # パス指定ノードからルートパスを引き継ぎます
+                "base_path": ("QNN_BASE_PATH",),
+            }
+        }
 
     RETURN_TYPES = ("VAE",)
     FUNCTION = "load_vae"
     CATEGORY = "QNN_Optimization"
 
-    def load_vae(self, folder_name):
-        base_path = os.path.abspath(os.path.join(folder_paths.get_output_directory(), "..", "models", "vae", folder_name))
-        path_vae = os.path.join(base_path, "model.onnx")
-
+    def load_vae(self, base_path):
+        # 引き渡されたベースパスから、HF構造のVAE Decoderへのフルパスを生成
+        path_vae = os.path.join(base_path, "vae_decoder", "model.onnx")
+        
         class QNNVAEWrapper:
             def decode(self, latent_tokens):
+                # パート3：QNNVAELoader の一番最初に追加してRAMを確保
+                print(f"[QNN VAE] 連動処理：UNetセッションの強制アンロードを実行します。")
+                QNNUNetLoader.unload_all_unet_sessions()
+                
                 print(f"[QNN VAE] セッション初期化中...")
                 sess_vae = ort.InferenceSession(path_vae, sess_options=qnn.session_options)
                 
@@ -51,9 +58,6 @@ class QNNVAELoader:
                 
                 # 最終出力直前で不要になった巨大データをすべて完全消去
                 del latent_np, out_vae_list, out_vae, sess_vae
-                # パート3：QNNVAELoader の一番最後、clean_memory() の直前に追加
-                print(f"[QNN VAE] 連動処理：UNetセッションの強制アンロードを実行します。")
-                QNNUNetLoader.unload_all_unet_sessions()
                 utils.clean_memory()
                 
                 return out_tensor

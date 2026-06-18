@@ -16,11 +16,14 @@ class QNNUNetLoader:
     
     @classmethod
     def INPUT_TYPES(s):
-        unet_list = folder_paths.get_filename_list("diffusion_models")
-        folders = sorted(list(set([os.path.dirname(f) for f in unet_list if os.path.dirname(f) != ""])))
-        if not folders: folders = ["フォルダを作成してください"]
-        return {"required": {"folder_name": (folders,)}}
+        return {
+            "required": {
+                # 前のノードから引き継いだベースパスを受け取ります
+                "base_path": ("QNN_BASE_PATH",),
+            }
+        }
     
+     
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "load_qnn_model"
     CATEGORY = "QNN_Optimization"
@@ -42,15 +45,13 @@ class QNNUNetLoader:
             # Pythonのゴミ箱とお掃除関数をフル稼働
             utils.clean_memory()
             
-    def load_qnn_model(self, folder_name):
-        base_path = os.path.join(folder_paths.get_output_directory(), "..", "models", "diffusion_models", folder_name)
-        
+    def load_qnn_model(self, base_path):
         paths = {
-            "part0": os.path.join(base_path, "model.onnx"),
-            "part1": os.path.join(base_path, "..", "Part1", "unet_part1_1024x1024.onnx"),
-            "part2": os.path.join(base_path, "..", "Part2", "unet_part2_1024x1024.onnx"),
-            "part3": os.path.join(base_path, "..", "Part3", "unet_part3_1024x1024.onnx"),
-            "part4": os.path.join(base_path, "..", "Part4", "unet_part4_1024x1024.onnx"),
+            "part0": os.path.join(base_path, "unet", "part0", "model.onnx"),
+            "part1": os.path.join(base_path, "unet", "part1", "model.onnx"),
+            "part2": os.path.join(base_path, "unet", "part2", "model.onnx"),
+            "part3": os.path.join(base_path, "unet", "part3", "model.onnx"),
+            "part4": os.path.join(base_path, "unet", "part4", "model.onnx"),
         }
         
         for name, path in paths.items():

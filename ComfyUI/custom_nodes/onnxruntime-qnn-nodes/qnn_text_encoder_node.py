@@ -13,23 +13,21 @@ from . import common_utils as utils
 class QNNTextEncoderLoader:
     @classmethod
     def INPUT_TYPES(s):
-        te_list = folder_paths.get_filename_list("text_encoders")
-        folders = sorted(list(set([os.path.dirname(f) for f in te_list if os.path.dirname(f) != ""])))
-        if not folders: folders = ["フォルダを作成してください"]
-        return {"required": {"folder_name": (folders,)}}
+        return {
+            "required": {
+                # パス指定ノードからルートパスを引き継ぎます
+                "base_path": ("QNN_BASE_PATH",),
+            }
+        }
 
     RETURN_TYPES = ("CLIP",)
     FUNCTION = "load_text_encoder"
     CATEGORY = "QNN_Optimization"
 
-    def load_text_encoder(self, folder_name):
-        base_path = os.path.abspath(os.path.join(folder_paths.get_output_directory(), "..", "models", "text_encoders", folder_name))
-        path_te1 = os.path.join(base_path, "model.onnx")
-        path_te2 = os.path.join(base_path, "..", "text_encoder_2", "model.onnx")
-
-        #print(f"[QNN CLIP] セッション初期化中...")
-        #sess_te1 = ort.InferenceSession(path_te1, sess_options=qnn.session_options)
-        #sess_te2 = ort.InferenceSession(path_te2, sess_options=qnn.session_options)
+    def load_text_encoder(self, base_path):
+        # 引き渡されたベースパスから、HF構造の各Text Encoderへのフルパスを生成
+        path_te1 = os.path.join(base_path, "text_encoder", "model.onnx")
+        path_te2 = os.path.join(base_path, "text_encoder_2", "model.onnx")
 
         from comfy.sdxl_clip import SDXLTokenizer
         
