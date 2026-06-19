@@ -1,89 +1,98 @@
-# ComfyUI用カスタムノード OnnxRuntime-QNN-Nodes
+# ComfyUI Custom Nodes: OnnxRuntime-QNN-Nodes
 
 ![Custom nodes screenshot](/custom_nodes_screenshot.png)
 
-## これは何？
+## What is this?
 
-Qualcomm製SoC向けに作成したComfyUI用のカスタムノードです。
-現状は、用意したモデルをSnapdragon X EliteのNPU向けにプリコンパイルしているため
-- Snapdragon X Elite
-- NPU
-- SDXLモデル
-という条件で動きます。
+This is a set of ComfyUI custom nodes specifically engineered to leverage Qualcomm SoCs for hardware-accelerated image generation. 
 
-### memo
+Currently, the pipeline is fully pre-compiled and configured out-of-the-box for the following specific environment:
+* **SoC**: Snapdragon X Elite
+* **Processor**: Hexagon NPU
+* **Model**: SDXL Models
 
-用意したモデルの都合上、NPUで動かすように実装していますが、
-ONNX Runtime QNN Execution Providerを利用しているため、少しコードを書き換えればGPU、CPUで動かすことも可能です。
-カスタムノード自体はSoCに依存した形式になっていないため、モデルを用意すれば別のQualcomm製SoCでもこのカスタムノードを利用することは可能です。
+### 💡 Tech Note
+While the provided models are strictly optimized for NPU execution, these nodes are built on top of the **ONNX Runtime QNN Execution Provider**. With minor code modifications, the underlying backend can be pointed to the GPU or CPU. Furthermore, the custom nodes themselves are architecture-agnostic; as long as you compile and provide the compatible weights, this extension can be utilized across various Qualcomm SoCs.
 
-## ComfyUIを自力で実行できる方向けの説明
+---
 
-本リポジトリにあるComfyUI/custom_nodes内のディレクトリonnxruntime-qnn-nodesを、ComfyUI本体のcustom_nodesディレクトリに配置してください。
-ワークフロー(OnnxRuntime-QNN-Workflow.json)を用意したので、ComfyUIの画面にドラッグアンドドロップすれば使えるようになります。
-あとは、📁 QNN Model Base Path Specifierノードにダウンロードしたモデルのディレクトリへのフルパスを与えてください。
-text_encoder、text_encoder_2、UNetなどのディレクトリがあるところを指定すればOKです。
+## Installation & Setup (For Experienced ComfyUI Users)
 
-## 使い方
+This guide assumes you already have a working, standalone ComfyUI environment.
 
-### モデルのダウンロード
+### 1. Install the Custom Node
+Copy the `onnxruntime-qnn-nodes` directory located inside this repository's `ComfyUI/custom_nodes/` path, and paste it directly into your own ComfyUI's native `custom_nodes` folder:
+`Your_ComfyUI_Path/custom_nodes/onnxruntime-qnn-nodes`
 
-[readme 2-download-the-model](readme.md#2-download-the-model)を参考にしてください
+### 2. Load the Workflow
+We have included a pre-configured workflow file (`OnnxRuntime-QNN-Workflow.json`) in this repository. Simply drag and drop this JSON file straight into your ComfyUI browser interface to load the pipeline.
 
-### ComfyUIの用意
+### 3. Configure the Model Path
+Locate the **📁 QNN Model Base Path Specifier** node within the loaded workflow. In the text field, input the **absolute full path** pointing to your downloaded model folder. 
+*(Make sure the specified directory contains the subfolders for `text_encoder`, `text_encoder_2`, and the split `UNet` models).*
 
-動作確認済みのバージョンは
-- python 3.13.3
-- ComfyUI 0.25.0
 
-このタイミングで、本カスタムノードの利用に必要な依存関係(onnxruntime-qnn==2.1.1、onnxruntime==1.24.4)をインストールしてしまいます。
-また、事前にCPU向けのPyTorchをインストールしておくとComfyUIの依存関係(requirements.txt)をスムーズにインストールできます。
+## How to Use & Step-by-Step Guide
 
-```
-git clone --branch v0.25.0 --depth 1  https://github.com/Comfy-Org/ComfyUI
+### 1. Download the Pre-compiled Models
+Please refer to the main repository guide: [readme 2-download-the-model](readme.md#2-download-the-model)
+
+### 2. Set Up the ComfyUI Environment
+The environment version verified to work with these custom nodes is:
+* **Python**: 3.13.3
+* **ComfyUI**: v0.25.0
+
+At this stage, we will pre-install the explicit dependencies required for the QNN nodes (`onnxruntime-qnn==2.1.1` and `onnxruntime==1.24.4`). 
+*Tip: Installing the CPU-targeted PyTorch wheel beforehand ensures a smoother installation of ComfyUI's core dependencies.*
+
+```bash
+# Clone the verified version of ComfyUI
+git clone --branch v0.25.0 --depth 1 https://github.com/Comfy-Org/ComfyUI
 cd ComfyUI
+
+# Install pre-requisites and QNN dependencies
 pip install setuptools wheel
 pip install onnxruntime-qnn==2.1.1
 pip install onnxruntime==1.24.4
+
+# Install CPU-targeted PyTorch
 pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
+
+# Install default ComfyUI dependencies
 pip install -r requirements.txt
 ```
 
-### カスタムノードの配置
+### 3. Deploy the Custom Nodes
+Clone this repository and move the `onnxruntime-qnn-nodes` folder into your ComfyUI's `custom_nodes` directory.
 
-本リポジトリにあるComfyUI/custom_nodes内のディレクトリonnxruntime-qnn-nodesを、ComfyUI本体のcustom_nodesディレクトリに配置してください。
-
-```
+```bash
+# Clone this repository
 git clone https://github.com/buuta-buta-butaata/SDXL-with-Snapdragon-X-Elite-NPU.git
+
+# (Move / Copy the ComfyUI/custom_nodes/onnxruntime-qnn-nodes directory into your local ComfyUI installation)
 ```
 
-### 実行の仕方
-
-ComfyUIの実行:
-```
+### 4. Running ComfyUI
+Launch ComfyUI using the CPU flags to prevent initialization errors:
+```bash
 python main.py --cpu --auto-launch --disable-api-nodes
 ```
 
-自動でブラウザが立ち上がってComfyUIの画面が表示されるはずなので、そうしたらOnnxRuntime-QNN-Workflow.jsonをComfyUIの画面にドラッグアンドドロップするのが楽です。
-あとは、📁 QNN Model Base Path Specifierノードにダウンロードしたモデルのディレクトリへのフルパスを与えてください。
-(text_encoder、text_encoder_2などのディレクトリがあるところ)
+Once the web interface automatically opens in your browser, drag and drop the `OnnxRuntime-QNN-Workflow.json` file straight into the ComfyUI grid. 
 
-## 問題点
+Lastly, find the **📁 QNN Model Base Path Specifier** node and input the **absolute full path** to your model root directory (the parent folder containing `text_encoder`, `text_encoder_2`, and the split `UNet` folders).
 
-#### UNetのモデル解放をVAE Decoderのノードで行ってしまっている
+---
 
-間違いなくUNet側のノードでモデル解放の処理は実施した方がよいのだけど、
-hookの仕方がよくわからない(´・ω・｀)
+## Known Issues & Current Limitations
 
-#### 処理速度が安定しない
+#### 🔄 UNet Memory Flush Is Triggered Inside the VAE Decoder Node
+The memory cleanup/model flushing for the UNet fragments should ideally be handled inside the UNet execution nodes. However, due to complications with how ComfyUI handles custom node hooks, it is currently triggered awkwardly inside the VAE Decoder node instead. If anyone knows a cleaner way to implement this hook, contributions are very welcome!
 
-例えば初回5.90s/it、2回目以降は8.08s/itになって悪化する。
-全体的に処理速度が遅くなっている、
-KサンプラーでCPUをめっちゃ使ってるのが原因っぽい
+#### 📉 Unstable Inference Speeds (Degradation on Subsequent Runs)
+Inference speeds are inconsistent. For example, the first generation hits around ~5.90 s/it, but the second run drops to ~8.08 s/it. The overall processing speed is slower than the native Python pipeline script, seemingly caused by heavy CPU overhead spikes inside the KSampler execution block.
 
-#### 既存のComfyUIノードのほとんどが利用できないっぽい？
+#### 🧩 Heavy Incompatibility with Native ComfyUI Ecosystem
+ComfyUI is deeply integrated assuming `torch` acceleration backends. Because these custom nodes are bypassing the standard torch pipeline to drive the ONNX Runtime under the hood, they are incompatible with almost all standard native nodes (ControlNet, IP-Adapter, LoRAs, etc.). 
 
-ComfyUIはCUDAというかtorchを使うことが前提みたいになっているので、
-偽装してonnxruntimeを内部で利用している本カスタムノードと相性がよくない。
-無理にComfyUIを使う理由ってあるんかな？
-ComfyUIが抱える資産で流用できるものってあれば面白いのだけど
+* *Developer's Note: Honestly, I’m questioning whether there's an actual benefit to using ComfyUI under these constraints. However, it would be extremely interesting if we could find a way to hijack and repurpose ComfyUI's massive library of existing assets/nodes for this NPU environment.*
