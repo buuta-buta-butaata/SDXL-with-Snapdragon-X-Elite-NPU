@@ -82,6 +82,38 @@ Once the web interface automatically opens in your browser, drag and drop the `O
 
 Lastly, find the **📁 QNN Model Base Path Specifier** node and input the **absolute full path** to your model root directory (the parent folder containing `text_encoder`, `text_encoder_2`, and the split `UNet` folders).
 
+### 📊 Workflow Node Architecture & Hardware Allocation
+
+To help understand how the pipeline is orchestrated, here is a breakdown of the custom nodes versus native ComfyUI nodes used in `OnnxRuntime-QNN-Workflow.json`, along with their actual hardware execution targets.
+
+| Node Name | Type | Hardware Target | Technical Detail |
+| :--- | :--- | :--- | :--- |
+| **📁 QNN Model Base Path Specifier** | Custom | — (Path Config) | Sets the absolute path for the compiled model directory. |
+| **🌟 QNN 5-Part UNet Loader** | Custom | **NPU** (QNN EP) | Sequentially loads the 5 UNet fragments. |
+| **🌟 QNN Text Encoder Loader** | Custom | **NPU** (QNN EP) | Loads the Text Encoder models into the NPU. |
+| **🌟 QNN VAE Decoder Loader** | Custom | **NPU** (QNN EP) | Loads the VAE Decoder model into the NPU. |
+| **🌟 QNN SDXL Latent Generator** | Custom | **CPU** | Generates the initial latent noise. Built as a custom node to hardcode the resolution, preventing dynamic resizing accidents that crash the QNN pipeline. |
+| **CLIP Text Encode (Prompt)** | Native | **NPU** (QNN EP) | *Note: While it is a native ComfyUI node, the actual text encoding backend is internally intercepted and routed to the NPU.* |
+| **VAE Decode** | Native | **NPU** (QNN EP) | *Note: This node serves as a structural bridge to connect the pipeline to the preview node; the heavy VAE decoding itself runs natively on the NPU.* |
+| **KSampler** | Native | **CPU & NPU** | **(Inference Bottleneck)** The heavy UNet computation itself is successfully routed to the **NPU**. However, the KSampler orchestrates the loops entirely on the **CPU**, causing massive data transfer overhead during the denoising steps. |
+| **Preview Image** | Native | **CPU** | Displays the final rendered image. |
+
+*(By reviewing this table, you can see why the **KSampler** introduces a significant CPU bottleneck, as explained in the Known Issues section below).*
+
+---
+
+## 🧠 Developer's Reflection: First Impressions of ComfyUI
+
+This project marked my very first time diving into the ComfyUI ecosystem. To my astonishment, I was able to build and spin up a working set of custom nodes in **just a few hours**. 
+
+Granted, the core UNet splitting logic was already fully written, and I had immense assistance from **Google Gemini** to glue everything together. Even so, the sheer extensibility and developer-friendliness of ComfyUI's architecture is absolutely phenomenal.
+
+Through this experimentation, I truly came to appreciate the core advantages of ComfyUI:
+* **Instant Visual Diagnostics**: It allows you to track the execution pipeline visually. For example, it became immediately obvious which specific node was dragging down performance and eating up processing time.
+* **A Massive Global Ecosystem**: The sheer volume of community-driven nodes and pre-built assets available is incredible.
+
+While the current QNN integration faces severe compatibility bottlenecks with native modules, the ability to visually dissect and understand the execution flow proves that building atop ComfyUI has immense future potential.
+
 ---
 
 ## Known Issues & Current Limitations
@@ -95,4 +127,4 @@ Inference speeds are inconsistent. For example, the first generation hits around
 #### 🧩 Heavy Incompatibility with Native ComfyUI Ecosystem
 ComfyUI is deeply integrated assuming `torch` acceleration backends. Because these custom nodes are bypassing the standard torch pipeline to drive the ONNX Runtime under the hood, they are incompatible with almost all standard native nodes (ControlNet, IP-Adapter, LoRAs, etc.). 
 
-* *Developer's Note: Honestly, I’m questioning whether there's an actual benefit to using ComfyUI under these constraints. However, it would be extremely interesting if we could find a way to hijack and repurpose ComfyUI's massive library of existing assets/nodes for this NPU environment.*
+* *Developer's Note: Honestly, I’m questioning whether there's an actual benefit to using ComfyUI under these constraints.(´・ω・｀) However, it would be extremely interesting if we could find a way to hijack and repurpose ComfyUI's massive library of existing assets/nodes for this NPU environment.*
