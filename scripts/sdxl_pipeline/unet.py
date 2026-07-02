@@ -110,22 +110,22 @@ class NpuUNetLoop:
             uncond_hidden_states = uncond_embeds.astype(np.float16)
         latents_torch = torch.from_numpy(latents_np)
     
-        # for i, t in enumerate(scheduler.timesteps):
-        # for t in tqdm(scheduler.timesteps):
-        for i, t in enumerate(tqdm(scheduler.timesteps)):
-            # 現在の進捗を表示
-            # print(f"🔄 Step {i+1}/{steps} (Timestep: {t.item():.1f})")
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            # for i, t in enumerate(scheduler.timesteps):
+            # for t in tqdm(scheduler.timesteps):
+            for i, t in enumerate(tqdm(scheduler.timesteps)):
+                # 現在の進捗を表示
+                # print(f"🔄 Step {i+1}/{steps} (Timestep: {t.item():.1f})")
         
-            scaled_latents_torch = scheduler.scale_model_input(latents_torch, t)
-            scaled_latents_np = scaled_latents_torch.numpy().astype(np.float16)
+                scaled_latents_torch = scheduler.scale_model_input(latents_torch, t)
+                scaled_latents_np = scaled_latents_torch.numpy().astype(np.float16)
 
-            # タイムステップをUNetが要求する形状 [1] のfloat32配列にする
-            timestep_np = np.array([t.item()], dtype=np.float32)
+                # タイムステップをUNetが要求する形状 [1] のfloat32配列にする
+                timestep_np = np.array([t.item()], dtype=np.float32)
         
-            # 常駐しているUNetのforwardを実行
-            # 前回の修正（内部でのNHWC変換、float32統一）が施されたUNetが動きます
-            if config.guidance_scale != 1:
-                with ThreadPoolExecutor(max_workers=2) as executor:
+                # 常駐しているUNetのforwardを実行
+                # 前回の修正（内部でのNHWC変換、float32統一）が施されたUNetが動きます
+                if config.guidance_scale != 1:
                     futures = [
                         executor.submit(self.forward, scaled_latents_np, timestep_np,
                                         base_inputs,
@@ -145,29 +145,29 @@ class NpuUNetLoop:
                         else:
                             noise_pred_text = f.result()[0]
                 
-                noise_pred = noise_pred_uncond + config.guidance_scale * (
-                    noise_pred_text - noise_pred_uncond
-                )
-            else:
-                noise_pred = self.forward(scaled_latents_np, timestep_np,
-                                          base_inputs, encoder_hidden_states).astype(np.float32)
+                    noise_pred = noise_pred_uncond + config.guidance_scale * (
+                        noise_pred_text - noise_pred_uncond
+                    )
+                else:
+                    noise_pred = self.forward(scaled_latents_np, timestep_np,
+                                              base_inputs, encoder_hidden_states).astype(np.float32)
             
-            # スケジューラーを使ってノイズを除去し、次のlatentsを計算
-            # ※ diffusersのschedulerはtorch.Tensorを期待するため、一時的に戻して処理
-            latents_torch = scheduler.step(
-                torch.from_numpy(noise_pred), 
-                t, 
-                torch.from_numpy(latents_np)
-            ).prev_sample
+                # スケジューラーを使ってノイズを除去し、次のlatentsを計算
+                # ※ diffusersのschedulerはtorch.Tensorを期待するため、一時的に戻して処理
+                latents_torch = scheduler.step(
+                    torch.from_numpy(noise_pred), 
+                    t, 
+                    torch.from_numpy(latents_np)
+                ).prev_sample
         
-            # 次のステップのためにNumPyに変換
-            latents_np = latents_torch.numpy()
-            """
-            out_latents_np = latents_np / 0.13025
+                # 次のステップのためにNumPyに変換
+                latents_np = latents_torch.numpy()
+                """
+                out_latents_np = latents_np / 0.13025
                 
-            out_image_tensor = vae_decoder.decode_latents(out_latents_np, auto_mem_free=False)
-            output_image(out_image_tensor, f"{t.item():.1f}.png")
-            """
+                out_image_tensor = vae_decoder.decode_latents(out_latents_np, auto_mem_free=False)
+                output_image(out_image_tensor, f"{t.item():.1f}.png")
+                """
         
         print("--- デノイズループ完了 ---")
         del base_inputs
