@@ -20,6 +20,7 @@ def parse_args():
     # parser.add_argument("--layout", choices=["P", "L", "Portrait", "Landscape"], default="", help="画像の形状を指定する。指定がない場合、1024x1024)")
     parser.add_argument("--guidance_scale", type=float, default=2, help="height")
     parser.add_argument("--output_dir", type=str, default=None, help="画像出力先のディレクトリ")
+    # parser.add_argument("--quantized_model", action="store_true", help="量子化されたモデルを使う")
     return parser.parse_args()
 
 def main():
@@ -35,6 +36,9 @@ def main():
     # dirs.text_encoder_dir = r"..\..\compiled_models\single\jnxl\fp16\text_encoder"
     # dirs.text_encoder_2_dir =  r"..\..\compiled_models\single\jnxl\fp16\text_encoder_2"
     # dirs.unet_dir = r"..\..\compiled_models\linked\jnxl\unet"
+    # if args.quantized_model:
+    #     dirs.unet_dir = r".\compiled_models\dreamshaper-xl-lightning-for-Snapdragon-X-Elite-Quantized\unet"
+    #     dirs.vae_decoder_dir = r".\compiled_models\dreamshaper-xl-lightning-for-Snapdragon-X-Elite-Quantized\vae_decoder"
     
     scheduler_type = KarrasDiffusionSchedulers.EulerAncestralDiscreteScheduler
 
@@ -55,6 +59,10 @@ def main():
     #     config.width = 1344
     #     config.height = 768
     # else:
+    #     config.width = 1024
+    #     config.height = 1024
+
+    # if not args.quantized_model:
     #     config.width = 1024
     #     config.height = 1024
     config.width = 1024

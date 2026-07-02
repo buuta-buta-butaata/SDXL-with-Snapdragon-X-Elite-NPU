@@ -5,7 +5,6 @@ start_time = time.perf_counter()
 import gc
 import os
 import psutil
-import torch
 
 import numpy as np
 from datetime import datetime

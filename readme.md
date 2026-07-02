@@ -5,11 +5,11 @@ The main goal of this project is to run Stable Diffusion XL (SDXL) models native
 
 This project serves as a Proof of Concept (PoC) to demonstrate the feasibility of high-resolution image generation on ARM64 Windows NPU hardware.
 
-## Current Status (As of June 20, 2026)
+## Current Status (As of July 2, 2026)
 
 ### 🚀 Running fp16 Models (Fully Operational)
-* **Performance**: ~5.48 s/it (Takes about 138 seconds total for a 1024x1024 image with 20 steps)
-* **Memory Usage**: Peak RAM usage is around 7.72 GB
+* **Performance**: ~4.03 s/it (Takes about 107 seconds total for a 1024x1024 image with 20 steps)
+* **Memory Usage**: Peak RAM usage is around 6.05 GB
 
 ### 🛠️ Quantization (Work in Progress)
 * **Performance**: ~1.6 s/it (Current ongoing benchmark)
@@ -214,15 +214,11 @@ Once execution finishes, a `split_models` directory will be generated containing
 
 ## Known Issues & Challenges
 
-### 1. NPU Utilization Caps Around 80%
-During inference with the `fp16` model, NPU usage hovers around 80% and does not reach 100%. 
-* **Root Cause**: This is likely a RAM bandwidth bottleneck. When running the quantized versions (which are much more memory-efficient), the NPU usage successfully reaches 100%. 
-
-### 2. Required CPU Transpose Overhead
+### 1. Required CPU Transpose Overhead
 For reasons unknown, the QNN compilation process inadvertently forces some model outputs to change from `NCHW` to `NHWC` format. 
 * **Impact**: To correct this, the script currently performs a `transpose` operation on the CPU to switch it back to `NCHW`. This introduces redundant overhead, and we are still investigating how to prevent this format alteration during pre-compilation.
 
-### 3. Fixed Image Resolution
+### 2. Fixed Image Resolution
 Due to the constraints of the QNN compiler, the image size must be strictly hardcoded (e.g., 1024x1024) at the time of pre-compilation. Dynamic resolution is not supported natively.
 * **Potential Workaround**: By leveraging the "weight-sharing" mechanism provided by Qualcomm AI Hub Workbench, it is theoretically possible to pre-compile and support multiple fixed resolutions (such as 1024x1024, 832x1216, 1344x768). However, this requires a significant amount of manual setup.
 

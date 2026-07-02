@@ -7,6 +7,7 @@ import numpy as np
 import onnxruntime as ort
 import torch
 
+from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED, FIRST_COMPLETED
 from tqdm.auto import tqdm
 
 import qnn_ep_helper as qnn
@@ -23,15 +24,15 @@ class NpuUNetLoop:
         mid_path = self.find_model_path(config.dirs.unet_dir, 'part2', config.width, config.height)
         up_1_path = self.find_model_path(config.dirs.unet_dir, 'part3', config.width, config.height)
         up_2_path = self.find_model_path(config.dirs.unet_dir, 'part4', config.width, config.height)
-        
+
         print("--- UNet 5分割モデルをNPUにロード中 (常駐駆動) ---")
         # ループ開始前に1度だけロードしてRAMとNPU上に固定
         # ファイルサイズの大きいものから読み込み、RAMをうまく解放する
-        self.sess_common = ort.InferenceSession((common_path), sess_options=qnn.session_options)
-        self.sess_down = ort.InferenceSession((down_path), sess_options=qnn.session_options)
-        self.sess_up2  = ort.InferenceSession((up_2_path), sess_options=qnn.session_options)
-        self.sess_mid  = ort.InferenceSession((mid_path), sess_options=qnn.session_options)
-        self.sess_up1  = ort.InferenceSession((up_1_path), sess_options=qnn.session_options)
+        self.sess_common = ort.InferenceSession(common_path, sess_options=qnn.session_options)
+        self.sess_down = ort.InferenceSession(down_path, sess_options=qnn.session_options)
+        self.sess_up2  = ort.InferenceSession(up_2_path, sess_options=qnn.session_options)
+        self.sess_mid  = ort.InferenceSession(mid_path, sess_options=qnn.session_options)
+        self.sess_up1  = ort.InferenceSession(up_1_path, sess_options=qnn.session_options)
         
         # 各セッションの出力を動的に自動取得
         self.out_names_common = [o.name for o in self.sess_common.get_outputs()]
@@ -124,18 +125,25 @@ class NpuUNetLoop:
             # 常駐しているUNetのforwardを実行
             # 前回の修正（内部でのNHWC変換、float32統一）が施されたUNetが動きます
             if config.guidance_scale != 1:
-                noise_pred_text = self.forward(scaled_latents_np, timestep_np,
-                                               base_inputs,
-                                               encoder_hidden_states,
-                                               save_calibration_data=True,
-                                               step=i,
-                                               ).astype(np.float32)
-                noise_pred_uncond = self.forward(scaled_latents_np, timestep_np,
-                                                 uncond_base_inputs,
-                                                 uncond_hidden_states,
-                                                 save_calibration_data=True,
-                                                 step=i,
-                                                 ).astype(np.float32)
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    futures = [
+                        executor.submit(self.forward, scaled_latents_np, timestep_np,
+                                        base_inputs,
+                                        encoder_hidden_states,
+                                        save_calibration_data=True,
+                                        step=i, is_uncond=False),
+                        executor.submit(self.forward, scaled_latents_np, timestep_np,
+                                        uncond_base_inputs,
+                                        uncond_hidden_states,
+                                        save_calibration_data=True,
+                                        step=i, is_uncond=True),
+                    ]
+                    done, not_done = wait(futures, return_when=ALL_COMPLETED)
+                    for f in done:
+                        if f.result()[1]:
+                            noise_pred_uncond = f.result()[0]
+                        else:
+                            noise_pred_text = f.result()[0]
                 
                 noise_pred = noise_pred_uncond + config.guidance_scale * (
                     noise_pred_text - noise_pred_uncond
@@ -168,7 +176,7 @@ class NpuUNetLoop:
 
         return latents_np
     
-    def forward(self, latents, timestep, base_inputs, encoder_hidden_states, save_calibration_data=False, step = 0):
+    def forward(self, latents, timestep, base_inputs, encoder_hidden_states, save_calibration_data=False, step = 0, is_uncond = False):
         """1ステップ分のノイズ予測を4つのモデルを繋げて実行"""
         # 0. Part 0: Common
         feed_common = {"timestep": timestep, **base_inputs}
@@ -208,7 +216,7 @@ class NpuUNetLoop:
         out_list_up2 = self.sess_up2.run(self.out_names_up2, feed_up2)
         noise_pred = out_list_up2[0] # out_sample
         
-        return noise_pred
+        return noise_pred, is_uncond
 
 if __name__ == "__main__":
     import torch

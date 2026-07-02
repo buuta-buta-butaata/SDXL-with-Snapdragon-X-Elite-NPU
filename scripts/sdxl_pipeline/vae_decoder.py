@@ -17,6 +17,9 @@ class VAEDecoder:
         model_path = os.path.join(model_dir, f"vae_decoder_{width}x{height}.onnx")
         if os.path.exists(model_path):
             return model_path
+        model_path = os.path.join(model_dir, f"{width}x{height}/model.onnx")
+        if os.path.exists(model_path):
+            return model_path
         return os.path.join(model_dir, f"{width}x{height}", "model.onnx")
 
     def decode_latents(self, latents: np.ndarray, auto_mem_free=True):
