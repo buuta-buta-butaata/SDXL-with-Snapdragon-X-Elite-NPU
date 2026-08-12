@@ -1,207 +1,167 @@
-import time
-print("処理時間計測開始")
-start_time = time.perf_counter()
+import logging
 
-import gc
-import os
-import psutil
+from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 
-import numpy as np
-from datetime import datetime
-from PIL import Image, PngImagePlugin
+from .text_processing import TextProcessing
+from .unet import UNet
+from .vae_decoder import VAEDecoder
+from . import image
 
-from diffusers.schedulers.scheduling_utils import KarrasDiffusionSchedulers
+from profilers import simple_profiler as prof
 
-# 自作した各モジュールから関数・クラスをインポート
-from text_processing  import TextProcessing
-from unet import NpuUNetLoop
-from vae_decoder import VAEDecoder
-from calib_data_collector import CalibrationDataCollector
+logger = logging.getLogger(__name__)
 
-import default_sdxl_config as def_conf
-import utils
 
-class SDXLDirs:
-    def __init__(
-            self,
-            output_dir = None,
-            scheduler_dir = None,
-            tokenizer_dir = None,
-            tokenizer_2_dir = None,
-            text_encoder_dir = None,
-            text_encoder_2_dir = None,
-            unet_dir = None,
-            vae_decoder_dir = None,
-            #vae_encoder_dir = None,
-            ):
-        self.output_dir = utils.value_or_default(output_dir,
-                                                 def_conf.DEFAULT_OUTPUT_DIR)
-        self.scheduler_dir = utils.value_or_default(scheduler_dir,
-                                                    def_conf.SCHEDULER_DIR)
-        self.tokenizer_dir = utils.value_or_default(tokenizer_dir,
-                                                    def_conf.TOKENIZER_DIR)
-        self.tokenizer_2_dir = utils.value_or_default(tokenizer_2_dir,
-                                                      def_conf.TOKENIZER_2_DIR)
-        self.text_encoder_dir = utils.value_or_default(text_encoder_dir,
-                                                       def_conf.TEXT_ENCODER_DIR)
-        self.text_encoder_2_dir = utils.value_or_default(text_encoder_2_dir,
-                                                         def_conf.TEXT_ENCODER_2_DIR)
-        self.unet_dir = utils.value_or_default(unet_dir,
-                                               def_conf.UNET_DIR)
-        self.vae_decoder_dir = utils.value_or_default(vae_decoder_dir,
-                                                      def_conf.VAE_DECODER_DIR)
+class BasePipeline(ABC):
+    @abstractmethod
+    def run(self):
+        raise NotImplementedError()
 
-        
-class SDXLConfig:
-    def __init__(
-            self,
-            prompt,
-            prompt_2 = None,
-            negative_prompt = "",
-            negative_prompt_2 = None,
-            steps = 20,
-            guidance_scale = 5.0,
-            seed = -1,
-            width = 1024,
-            height = 1024,
-            sdxl_dirs = None,
-            scheduler_type = KarrasDiffusionSchedulers.EulerAncestralDiscreteScheduler,
-            calib_strategy = 0,
-            calib_data_collector = None,
-    ):
-        self.prompt = prompt
-        self.prompt_2 = utils.value_or_default(prompt_2,
-                                               prompt)
-        self.negative_prompt = negative_prompt
-        self.negative_prompt_2 = utils.value_or_default(negative_prompt_2,
-                                                        negative_prompt)
-        self.steps = steps
-        self.guidance_scale = guidance_scale
-        self.seed = seed
-        self.width = width
-        self.height = height
-        self.dirs = utils.value_or_default(sdxl_dirs,
-                                                SDXLDirs())
-        self.scheduler_type = scheduler_type
-        self.calib_strategy = calib_strategy
-        self.calib_data_collector = calib_data_collector
-                                                
-
-class SDXLPipeline:
-    def __init__(self, sdxl_config):
-        self.config = sdxl_config
+class SDXLPipeline(BasePipeline):
+    def __init__(self, config):
+        logger.debug(vars(config))
+        self.config = config
+        self.text_processing = None
+        self.unet = None
+        self.vae_decoder = None
 
     def run(self):
-        global start_time
-        # print("処理時間計測開始")
-        # start_time = time.perf_counter()
-        
-        print("=========================================")
-        print("🚀 SDXL NPU パイプライン 起動")
-        print("=========================================")
-        
-        elapsed_time = time.perf_counter()
-        print(f"\n総経過時間: {elapsed_time - start_time:.3f} 秒")
-        
-        text_processing = TextProcessing(self.config.dirs.text_encoder_dir,
-                                         self.config.dirs.tokenizer_dir,
-                                         self.config.dirs.text_encoder_2_dir,
-                                         self.config.dirs.tokenizer_2_dir)
+        logger.info("Running SDXL pipeline on NPU...")
+        print(f"Prompt: {self.config.prompt}")
+        # print(f"prompt_2: {self.config.prompt_2}")
+        # print(f"negative prompt: {self.config.negative_prompt}")
+        # print(f"negative prompt_2: {self.config.negative_prompt_2}")
+        profiler = prof.register("pipeline")
 
-        prompt_embeds, pooled_prompt_embeds, uncond_embeds, uncond_pooled_embeds = text_processing.encode_text(self.config)
-        
-        elapsed_time = time.perf_counter()
-        print(f"\n総経過時間: {elapsed_time - start_time:.3f} 秒")
+        if self.text_processing is None:
+            self.text_processing = TextProcessing(self.config.dirs["text_encoder_dir"],
+                                                  self.config.dirs["tokenizer_dir"],
+                                                  self.config.dirs["text_encoder_2_dir"],
+                                                  self.config.dirs["tokenizer_2_dir"],
+                                                  self.config.use_torch)
 
-        unet = NpuUNetLoop(self.config)
-        latents_np = unet.inference(self.config, prompt_embeds, pooled_prompt_embeds,
-                  uncond_embeds, uncond_pooled_embeds)
+        (prompt_embeds, pooled_prompt_embeds,
+         uncond_embeds, uncond_pooled_embeds) = self.text_processing.encode_text(self.config, False)
         
-        # 用済みとなった常駐UNet、およびテキスト埋め込みをメモリから完全に抹殺
-        del unet
+        del self.text_processing
+
+        self.print_current_used_memory()
+
+        if self.unet is None:
+            logger.info("*" * 43)
+            logger.info("Loading UNet models...")
+            self.unet = UNet(self.config)
+            self.unet.load_models(self.config)
+            logger.info("  -> Loaded")
+            logger.info("*" * 43)
+
+        self.print_current_used_memory()
+        
+        profiler.start_profile("unet")
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            latents = self.unet.inference(self.config, prompt_embeds, pooled_prompt_embeds,
+                                          uncond_embeds, uncond_pooled_embeds, executor)
+        
+        profiler.stop_profile("unet")
+        del self.unet
         del prompt_embeds, pooled_prompt_embeds
-        if self.config.guidance_scale != 1:
+        if self.config.cfg != 1:
             del uncond_embeds, uncond_pooled_embeds
 
+        if self.config.debug_mode:
+            image.preview_image(latents, self.config.dirs["output_dir"], self.config.output_prefix)
+
         # --------------------------------------------------
-        # Step 5: VAE デコード ➔ 画像ファイル出力
+        # VAE decoder
         # --------------------------------------------------
-        # VAEの標準的なスケーリングファクター (0.1305) で元に戻す
-        latents_np = latents_np / 0.13025
-        # self.output_image(latents_np)
+        latents = latents / 0.13025
             
-        # VAEを実行してRGB画像テンソルを取得
-        # vae_decoder = VAEDecoder()
-        if self.config.calib_data_collector:
-            self.config.calib_data_collector.save("vae_decoder", latents_np)
-
-        elapsed_time = time.perf_counter()
-        print(f"\n総経過時間: {elapsed_time - start_time:.3f} 秒")
-
-        vae_decoder = VAEDecoder(self.config)
-        image_tensor = vae_decoder.decode_latents(latents_np, auto_mem_free=False)
+        profiler.start_profile("vae_decoder")
+            
+        if self.vae_decoder is None:
+            self.vae_decoder = VAEDecoder(self.config)
+        image_tensor = self.vae_decoder.decode(latents, auto_mem_free=False)
     
-        elapsed_time = time.perf_counter()
-        print(f"\n総経過時間: {elapsed_time - start_time:.3f} 秒")
+        profiler.stop_profile("vae_decoder")
 
-        self.output_image(image_tensor)
-        end_time = time.perf_counter()
-        print(f"\n合計処理時間: {end_time - start_time:.3f} 秒")
+        profiler.start_profile("pil")
+        image.output_image(image_tensor, **vars(self.config))
+        profiler.stop_profile("pil")
 
-        peak_mem = self.get_peak_memory_gb()
-        print("==================================================")
-        print(" 🛠️  MEMORY PROFILE REPORT")
-        print("==================================================")
-        print(f" 👑 推論中のピークRAM: {peak_mem:.2f} GB")
-        print("==================================================")
+        profiler.destroy_profile_event()
+
+        if self.config.profile:
+            self.print_summary()
+
+        if self.config.debug_mode:
+            from utils import check_torch_imported
+            check_torch_imported()
+
+    def print_current_used_memory(self, output_func=logger.info):
+        total, used, available, percent = prof.get_current_memory_info()
+        width = 43
+        col_1 = 23
+        col_2 = width - col_1 - 10
+        output_func("=" * width)
+        output_func(" Current RAM Info")
+        output_func("=" * width)
+        output_func(" System RAM Info")
+        output_func("-" * width)
+        output_func("| {:^{}} | {:>{}} GB |".format("Total RAM", col_1, total, col_2))
+        output_func("| {:^{}} | {:>{}} GB |".format("Used RAM", col_1, used, col_2))
+        output_func("| {:^{}} | {:>{}} GB |".format("Available RAM", col_1, available, col_2))
+        output_func("| {:^{}} | {:>{}}  % |".format("RAM Usage", col_1, percent, col_2))
+        output_func("-" * width)
         
-    def output_image(self, image_tensor):
-        print("\n--- [最終工程] 後処理 ＆ 画像保存 ---")
-        metadata = PngImagePlugin.PngInfo()
-        metadata.add_text("prompt", self.config.prompt)
-        metadata.add_text("negative_prompt", self.config.negative_prompt)
-        metadata.add_text("prompt_2", self.config.prompt_2)
-        metadata.add_text("negative_prompt_2", self.config.negative_prompt_2)
-        metadata.add_text("steps", str(self.config.steps))
-        metadata.add_text("guidance_scale", str(self.config.guidance_scale))
-        metadata.add_text("seed", str(self.config.seed))
-        filename = f"output_sdxl_npu{datetime.now().strftime("%Y%m%d%H%M%S")}.png"
-        output_path = os.path.join(self.config.dirs.output_dir,
-                                   filename)
-        
-        # テンソルを [0, 1] の範囲にクリップし、チャンネル順を (H, W, C) に変換
-        image = (image_tensor / 2 + 0.5).clip(0, 1)
-        image = image.squeeze(0).transpose(1, 2, 0) # (3, 1024, 1024) -> (1024, 1024, 3)
-    
-        # [0, 255] の uint8 (画像データ型) に変換
-        image_uint8 = (image * 255).astype(np.uint8)
-    
-        # PILを使って画像オブジェクトに変換し、保存
-        output_image = Image.fromarray(image_uint8)
-        output_image.save(output_path, pnginfo=metadata)
-        print(f"🎨 完了！ 『{filename}』 が正常に保存されました。")
-        print(f"path: {output_path}")
+        peak_mem = prof.get_peak_memory_gb()
+        output_func(" Process RAM Info")
+        output_func("-" * width)
+        output_func("| {:^{}} | {:>{}.2f} GB |".format("Peak RAM", col_1, peak_mem, col_2))
+        output_func("-" * width)
 
-    def get_peak_memory_gb(self):
-        """
-        現在のPythonプロセスが消費した最大物理メモリ（ピークRAM）をGB単位で返します。
-        Windows環境専用の API (PeakWorkingSetSize) を安全に叩きます。
-        """
-        process = psutil.Process(os.getpid())
+    def print_latency(self, prof_name, width, col_1, col_2, sort=False, output_func=logger.info):
+        profiler = prof.get(prof_name)
+        output_func(f" {prof_name} Latency Info")
+        output_func("-" * width)
+        output_func("| {:^{}} | {:^{}} |".format("Module", col_1, "Latency", col_2))
+        output_func("| {:^{}} | {:^{}} |".format("-" * col_1, col_1, "-" * col_2, col_2))
+        if sort:
+            events = profiler.events
+            events.sort()
+        else:
+            events = profiler.events
+        for event in events:
+            if event == "all":
+                continue
+            output_func("| {:^{}} | {:>{}.3f} sec |".format(event, col_1, profiler.event_elapsed_time(event),
+                                                             col_2 - 4))
+        output_func("| {:^{}} | {:^{}} |".format("-" * col_1, col_1, "-" * col_2, col_2))
+        output_func("| {:^{}} | {:>{}.3f} sec |".format("all", col_1, profiler.event_elapsed_time("all"), col_2 - 4))
+        output_func("-" * width)
         
-        if os.name == 'nt':  # Windows環境
-            # info.PeakWorkingSetSize に最大消費バイト数が記録されています
-            info = process.memory_info()
-            # peak_bytes = getattr(info, 'PeakWorkingSetSize', info.rss)
-            peak_bytes = info.peak_wset
-        else:  # Linux / macOS 互換用の保険
-            peak_bytes = process.memory_info().rss
+    def print_summary(self, output_func=logger.info):
+        width = 43
+        col_1 = 23
+        col_2 = width - col_1 - 7
+        output_func("=" * width)
+        output_func(" 🛠️  PROFILE REPORT SUMMARY")
+        output_func("=" * width)
 
-        return peak_bytes / (1024 ** 3) # バイトからGBに変換
+        self.print_latency("pipeline", width, col_1, col_2, output_func)
+        if self.config.debug_mode:
+            self.print_latency("unet", width, col_1, col_2, True, output_func=logger.debug)
+
+        peak_mem = prof.get_peak_memory_gb()
+        output_func(" Process RAM Info")
+        output_func("-" * width)
+        output_func("| {:^{}} | {:>{}.2f} GB |".format("Peak RAM", col_1, peak_mem, col_2 - 3))
+        output_func("-" * width)
 
     
 if __name__ == "__main__":
-    conf = SDXLConfig("A beautiful cyberpunk city, high resolution, 8k, neon lights, highly detailed")
+    from types import SimpleNamespace
+    conf = SimpleNamespace(prompt="A beautiful cyberpunk city, high resolution, 8k, neon lights, highly detailed")
     main = SDXLPipeline(conf)
-    main.run();
+    main.run()
 

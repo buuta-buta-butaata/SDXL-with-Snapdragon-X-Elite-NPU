@@ -6,9 +6,12 @@ __pycache__/
 
 *.png
 
+*.dll
 *.onnx
 *.bin
 *.data
 *.safetensors
 tokenizer/
 tokenizer_2/
+
+.vscode/

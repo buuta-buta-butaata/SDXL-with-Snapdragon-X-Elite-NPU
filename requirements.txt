@@ -2,8 +2,8 @@ accelerate==1.13.0
 diffusers==0.37.1
 numpy==2.4.4
 onnx==1.21.0
-onnxruntime-qnn==2.3.0
-onnxruntime==1.24.4
+onnxruntime-qnn==2.4.0
+onnxruntime==1.28.0
 onnxscript==0.6.2
 psutil==7.2.2
 safetensors==0.7.0
@@ -12,3 +12,5 @@ torch==2.10.0+cpu
 torchvision==0.25.0+8ac84ee
 tqdm==4.67.3
 transformers==4.57.6
+huggingface_hub==0.36.2
+hf_xet==1.5.1
