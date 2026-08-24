@@ -260,10 +260,6 @@ Splitting the UNet into 5 parts was originally a workaround for file-size limita
 Because the UNet is segmented into meaningful logical blocks (`down`, `mid`, `up`), it is much easier to isolate which specific parts of the network struggle during quantization.
 * Using the Qualcomm AI Hub Workbench, we can monitor Peak Signal-to-Noise Ratio (PSNR) values on a per-block basis. This allows us to see exactly how different prompt characteristics impact the quantization quality of individual sections.
 
-### 💾 Extreme Ultra-Low RAM Execution
-Currently, all 5 split modules are loaded into RAM simultaneously. However, by implementing a "Load-on-Demand" sequential pipeline (loading one block, executing it, flushing it from memory, and loading the next), the UNet can be run using **under 5 GB of RAM**.
-* **The Catch**: While this could theoretically allow SDXL to run on 8 GB RAM machines, the constant disk I/O degrades performance down to roughly ~30 s/it. A 20-step generation would take nearly 10 minutes, putting immense stress on the storage drive. 
-
 ### 💾 Extreme Ultra-Low RAM Execution & 8 GB RAM Compatibility
 In earlier versions, achieving ultra-low memory consumption required a hypothetical "Load-on-Demand" sequential pipeline (loading one block, executing it, flushing it from memory, and loading the next). While this approach could theoretically lower the UNet RAM footprint to under 2 GB (potentially allowing execution on extremely constrained 4 GB RAM systems), the constant disk I/O degrades performance down to roughly ~30 s/it—putting immense stress on storage drives.
 
@@ -278,7 +274,7 @@ While this project was built and validated specifically for the Snapdragon X Eli
 ### Q. Will this run on other SoCs, like the Snapdragon X Plus?
 **A.** If the model is supported by the Qualcomm AI Hub Workbench, it should theoretically work if you re-compile it targeting your specific SoC. Feel free to try it out! 
 
-*(An update on development: I have actually successfully run **SD 3.5 Medium** in native FP16 on the NPU—you can check out that repository here: [SD35-with-Snapdragon-X-Elite-NPU](../SD35-with-Snapdragon-X-Elite-NPU). However, the generation speed for SD 3.5 is currently too slow—taking around 144 seconds for just 8 steps even with the Turbo model, making it unfeasible for daily use on the Snapdragon X Elite NPU. Because of this, my focus has shifted back to unlocking the full potential and daily practicality of SDXL in this repository).*
+*(An update on development: I have actually successfully run **SD 3.5 Medium** in native FP16 on the NPU—you can check out that repository here: [SD35-with-Snapdragon-X-Elite-NPU](https://github.com/buuta-buta-butaata/SD35-with-Snapdragon-X-Elite-NPU). However, the generation speed for SD 3.5 is currently too slow—taking around 144 seconds for just 8 steps even with the Turbo model, making it unfeasible for daily use on the Snapdragon X Elite NPU. Because of this, my focus has shifted back to unlocking the full potential and daily practicality of SDXL in this repository).*
 
 Additionally, since the Snapdragon X Plus shares the exact same Hexagon Tensor Processor architecture and Model ID as the X Elite, the pre-compiled models provided here *might* actually run on X Plus hardware without any modification.
 
