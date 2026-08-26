@@ -30,6 +30,9 @@ class Scheduler:
         self.generator = np.random.default_rng(seed)
         # self.generator = np.random.Generator(np.random.MT19937(seed))
 
+    def add_noise(self, original_samples, noise, timesteps):
+        return self.scheduler.add_noise(original_samples, noise, timesteps)
+
     def generate_noise_latents(self, config):
         return self.generator.standard_normal((1, 4, config.height // 8, config.width // 8), dtype=np.float32)
 

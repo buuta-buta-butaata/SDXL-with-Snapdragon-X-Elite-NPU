@@ -8,7 +8,7 @@ from .unet import UNet
 from .vae_decoder import VAEDecoder
 from . import image
 
-from .pipeline import SDXLPipeline
+from .pipeline import SDXLPipeline, SCALING_FACTOR
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class SDXLBatchPipeline(SDXLPipeline):
                 latents = self.unet.inference(self.config, prompt_embeds, pooled_prompt_embeds,
                                               uncond_embeds, uncond_pooled_embeds, executor)
         
-                latents = latents / 0.13025
+                latents = latents / SCALING_FACTOR
                 # image_tensor = self.vae_decoder.decode(latents, auto_mem_free=False)
                 # image.output_image(image_tensor, **vars(self.config))
                 latents_list.append(latents)

@@ -21,15 +21,7 @@ class Txt2ImgCommand(BaseCLICommand):
                              for i, d in enumerate(glob.glob(os.path.join(MODEL_ROOT_DIR, "*"))) if os.path.isdir(d)])
 
     @staticmethod
-    def register_subcommand(parser: ArgumentParser) -> None:
-
-        txt2img_parser = parser.add_parser(
-            "txt2img",
-            formatter_class=MyHelpFormatter,
-            help="Generate images from text prompts.",
-            usage="\n sdxlite-cli txt2img [options]"
-        )
-
+    def _register(txt2img_parser: ArgumentParser) -> None:
         logger.debug(Txt2ImgCommand.available_schedulers)
         logger.debug(f"available_schedulers: {Txt2ImgCommand.available_schedulers}")
 
@@ -227,6 +219,19 @@ class Txt2ImgCommand(BaseCLICommand):
             metavar="PREFIX",
             help="Prefix for the saved image filenames."
         )
+    
+    @staticmethod
+    def register_subcommand(parser: ArgumentParser) -> None:
+
+        txt2img_parser = parser.add_parser(
+            "txt2img",
+            formatter_class=MyHelpFormatter,
+            help="Generate images from text prompts.",
+            usage="\n sdxlite-cli txt2img [options]"
+        )
+
+        Txt2ImgCommand._register(txt2img_parser)
+
         txt2img_parser.set_defaults(func=txt2img_command_factory)
 
     def _validate_prompts(self, config):
@@ -280,7 +285,6 @@ class Txt2ImgCommand(BaseCLICommand):
 
         dirs["vae_decoder_dir"] = rf"{MODEL_ROOT_DIR}\{name}\vae_decoder\{res_str}"
         dirs["vae_encoder_dir"] = rf"{MODEL_ROOT_DIR}\{name}\vae_encoder\{res_str}"
-        dirs["vae_encoder_dir"] = rf"{MODEL_ROOT_DIR}\{name}\vae_encoder"
 
         dirs["text_encoder_dir"] = rf"{MODEL_ROOT_DIR}\{name}\text_encoder"
         dirs["text_encoder_2_dir"] =  rf"{MODEL_ROOT_DIR}\{name}\text_encoder_2"
@@ -355,7 +359,7 @@ class Txt2ImgCommand(BaseCLICommand):
         config, res_str = self._validate_layout(config)
         config, dirs = self._validate_dirs(config, res_str)
         config = self._validate_torch(config, dirs)
-        
+
         self.config = config
         
     def run(self):

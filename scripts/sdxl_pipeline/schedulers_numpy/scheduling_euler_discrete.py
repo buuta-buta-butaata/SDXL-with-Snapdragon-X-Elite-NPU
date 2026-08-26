@@ -818,12 +818,13 @@ class EulerDiscreteScheduler(SchedulerMixin, ConfigMixin):
         """
         # Make sure sigmas and timesteps have the same device and dtype as original_samples
         sigmas = self.sigmas.astype(dtype=original_samples.dtype)
-        if original_samples.device.type == "mps" and torch.is_floating_point(timesteps):
-            # mps does not support float64
-            schedule_timesteps = self.timesteps.astype(dtype=torch.float32)
-            timesteps = timesteps.astype(dtype=torch.float32)
-        else:
-            schedule_timesteps = self.timesteps
+        # if original_samples.device.type == "mps" and torch.is_floating_point(timesteps):
+        #     # mps does not support float64
+        #     schedule_timesteps = self.timesteps.astype(dtype=torch.float32)
+        #     timesteps = timesteps.astype(dtype=torch.float32)
+        # else:
+        #     schedule_timesteps = self.timesteps
+        schedule_timesteps = self.timesteps
 
         # self.begin_index is None when scheduler is used for training, or pipeline does not implement set_begin_index
         if self.begin_index is None:
@@ -837,7 +838,8 @@ class EulerDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         sigma = sigmas[step_indices].flatten()
         while len(sigma.shape) < len(original_samples.shape):
-            sigma = sigma.unsqueeze(-1)
+            # sigma = sigma.unsqueeze(-1)
+            sigma = np.expand_dims(sigma, axis=-1)
 
         noisy_samples = original_samples + noise * sigma
         return noisy_samples
@@ -874,24 +876,27 @@ class EulerDiscreteScheduler(SchedulerMixin, ConfigMixin):
                 ),
             )
 
-        if sample.device.type == "mps" and torch.is_floating_point(timesteps):
-            # mps does not support float64
-            schedule_timesteps = self.timesteps.astype(dtype=torch.float32)
-            timesteps = timesteps.astype(dtype=torch.float32)
-        else:
-            schedule_timesteps = self.timesteps
+        # if sample.device.type == "mps" and torch.is_floating_point(timesteps):
+        #     # mps does not support float64
+        #     schedule_timesteps = self.timesteps.astype(dtype=torch.float32)
+        #     timesteps = timesteps.astype(dtype=torch.float32)
+        # else:
+        #     schedule_timesteps = self.timesteps
+        schedule_timesteps = self.timesteps
 
         step_indices = [self.index_for_timestep(t, schedule_timesteps) for t in timesteps]
         alphas_cumprod = self.alphas_cumprod.astype(sample.dtype)
         sqrt_alpha_prod = alphas_cumprod[step_indices] ** 0.5
         sqrt_alpha_prod = sqrt_alpha_prod.flatten()
         while len(sqrt_alpha_prod.shape) < len(sample.shape):
-            sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
+            # sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
+            sqrt_alpha_prod = np.expand_dims(sqrt_alpha_prod, axis=-1)
 
         sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[step_indices]) ** 0.5
         sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten()
         while len(sqrt_one_minus_alpha_prod.shape) < len(sample.shape):
-            sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
+            # sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
+            sqrt_one_minus_alpha_prod = np.expand_dims(sqrt_one_minus_alpha_prod, axis=-1)
 
         velocity = sqrt_alpha_prod * noise - sqrt_one_minus_alpha_prod * sample
         return velocity

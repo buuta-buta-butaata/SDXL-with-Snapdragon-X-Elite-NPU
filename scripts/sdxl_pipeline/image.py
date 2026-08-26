@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 from datetime import datetime
-from PIL import Image, PngImagePlugin
+from PIL import Image, PngImagePlugin, ImageFilter
 
 logger = logging.getLogger(__name__)
 
@@ -55,3 +55,44 @@ def output_image(image_tensor, output_dir, output_prefix, **config):
     print(f"Image saved to: {output_path}, seed: {config['seed']}")
     logger.info(f"Image saved to: {output_path}, seed: {config['seed']}")
 
+def preprocess_image(image_path, target_size=(1024, 1024)):
+    # 1. 画像の読み込みとRGB変換、リサイズ
+    image = Image.open(image_path).convert("RGB")
+    image = image.resize(target_size, resample=Image.Resampling.LANCZOS)
+    
+    # 2. numpy配列に変換 (0 ~ 255)
+    image_np = np.array(image).astype(np.float16)
+    
+    # 3. 軸の入れ替え (Height, Width, Channel) -> (Channel, Height, Width)
+    image_np = image_np.transpose(2, 0, 1)
+    
+    # 4. バッチ次元の追加 (1, Channel, Height, Width)
+    image_np = np.expand_dims(image_np, axis=0)
+    
+    # 5. 正規化 (0~255 -> -1.0~1.0)
+    # VAE Encoderは、ピクセル値が -1 から 1 の範囲であることを想定しています
+    image_normalized = (image_np / 127.5) - 1.0
+    
+    return image_normalized
+
+def preprocess_mask(mask_path, target_size=(128, 128), blur_radius=16):
+    """
+    マスク画像の前処理
+    :param mask_path: マスク画像のパス
+    :param target_size: UNetに渡すLatentのサイズ（通常は 128x128）
+    :param blur_radius: ぼかしの強度（ピクセル半径。0を指定するとぼかしなし）
+    """
+    mask = Image.open(mask_path).convert("L")
+
+    if blur_radius > 0:
+        mask = mask.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+    
+    mask = mask.resize(target_size, resample=Image.Resampling.BILINEAR)
+
+    mask_np = np.array(mask).astype(np.float16) / 255.0
+    # mask_np = np.floor(mask_np)
+
+    # 形状をUNet/Latentに合わせる (1, 1, 128, 128)
+    mask_np = np.expand_dims(mask_np, axis=(0, 1))
+    
+    return mask_np

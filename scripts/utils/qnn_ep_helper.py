@@ -14,6 +14,7 @@ selected_ep_devices = [ep_device for ep_device in all_ep_devices if ep_device.ep
 ep_options = {'backend_path': qnn_ep.get_qnn_htp_path(),
               "enable_htp_fp16_precision" : "1",
               "htp_performance_mode": "burst",
+              # "enable_vtcm_backup_buffer_sharing": "1",
               # "disable_file_mapped_weights": "1",
               #"enable_htp_shared_memory_allocator": "1",
               #"htp_graph_finalization_optimization_mode": "1",

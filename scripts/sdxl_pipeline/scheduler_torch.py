@@ -1,5 +1,6 @@
 import os
 import torch
+import numpy as np
 from pathlib import Path
 
 from diffusers import (
@@ -28,6 +29,11 @@ class Scheduler(scheduler_numpy.Scheduler):
         self.scheduler = self.scheduler_dict[scheduler_type][1].from_pretrained(Path(config_path), **kwargs)
         self.generator = torch.manual_seed(seed)
 
+    def add_noise(self, original_samples, noise, timesteps):
+        return self.scheduler.add_noise(torch.from_numpy(original_samples),
+                                        torch.from_numpy(noise),
+                                        torch.from_numpy(np.array(timesteps))).numpy()
+
     def generate_noise_latents(self, config):
         return torch.randn(1, 4, config.height // 8, config.width // 8,
                            dtype=torch.float32, generator=self.generator).numpy()
@@ -39,7 +45,8 @@ class Scheduler(scheduler_numpy.Scheduler):
         return self.scheduler.init_noise_sigma.numpy()
 
     def scale_model_input(self, sample, timestep, *args, **kwargs):
-        return self.scheduler.scale_model_input(torch.from_numpy(sample), timestep, *args, **kwargs).numpy()
+        return self.scheduler.scale_model_input(torch.from_numpy(sample),
+                                                torch.from_numpy(timestep), *args, **kwargs).numpy()
 
     def step(
         self,

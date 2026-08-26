@@ -52,24 +52,6 @@ class UNet:
 
         prof.register("unet")
 
-        if len(self.sessions) == 0:
-            self.load_models(config)
-
-        add_time_ids = np.array([[config.height, config.width,
-                                  0, 0,
-                                  config.height, config.width]], dtype=self.part0_type)
-
-        base_inputs = {
-            "text_embeds": pooled_prompt_embeds.astype(self.part0_type),
-            "time_ids": add_time_ids
-        }
-
-        if config.cfg != 1:
-            uncond_base_inputs = {
-                "text_embeds": uncond_pooled_embeds.astype(self.part0_type),
-                "time_ids": add_time_ids
-            }
-    
         if config.seed == -1:
             config.seed = np.random.randint(np.iinfo(np.uint32).max, dtype=np.uint32)
         logger.debug(f"seed: {config.seed}")
@@ -88,8 +70,8 @@ class UNet:
         config.scheduler_config = vars(scheduler.config)
         logger.debug(f"Generated scheduler_config: {config.scheduler_config}")
 
-        latents = scheduler.generate_noise_latents(config)
-        latents = latents * scheduler.init_noise_sigma
+        init_latents = self.get_init_latents(scheduler, config)
+        latents, timesteps = self.prepare_latents(init_latents, scheduler, config)
         
         # --------------------------------------------------
         # Denoise
@@ -99,12 +81,29 @@ class UNet:
         if config.cfg != 1:
             uncond_hidden_states = uncond_embeds.astype(np.float16)
     
-        for i, t in enumerate(tqdm(scheduler.timesteps)):
-            scaled_latents = scheduler.scale_model_input(latents, t).astype(np.float16)
+        if len(self.sessions) == 0:
+            self.load_models(config)
 
+        add_time_ids = np.array([[config.height, config.width,
+                                  0, 0,
+                                  config.height, config.width]], dtype=self.part0_type)
+
+        base_inputs = {
+            "text_embeds": pooled_prompt_embeds.astype(self.part0_type),
+            "time_ids": add_time_ids
+        }
+
+        if config.cfg != 1:
+            uncond_base_inputs = {
+                "text_embeds": uncond_pooled_embeds.astype(self.part0_type),
+                "time_ids": add_time_ids
+            }
+    
+        for i, t in enumerate(tqdm(timesteps)):
             # タイムステップをUNetが要求する形状 [1] のfloat32配列にする
             timestep = np.array([t.item()], dtype=np.float32)
-    
+            scaled_latents = scheduler.scale_model_input(latents, timestep).astype(np.float16)
+
             # 常駐しているUNetのforwardを実行
             if config.cfg != 1:
                 futures = [
@@ -131,10 +130,23 @@ class UNet:
                 noise_pred = self.forward(scaled_latents, timestep,
                                           base_inputs, encoder_hidden_states)[0].astype(np.float32)
         
-            latents = scheduler.step(noise_pred, t, latents).prev_sample
-            prof.get("unet").destroy_profile_event()
+            latents = scheduler.step(noise_pred, timestep, latents).prev_sample
+            latents = self.add_noise(latents, scheduler, timestep, config)
+
+        prof.get("unet").destroy_profile_event()
 
         return latents
+
+    def add_noise(self, latents, scheduler, timestep, config):
+        return latents
+    
+    def get_init_latents(self, scheduler, config):
+        latents = scheduler.generate_noise_latents(config)
+        return latents
+
+    def prepare_latents(self, init_latents, scheduler, config):
+        init_latents = init_latents * scheduler.init_noise_sigma
+        return init_latents, scheduler.timesteps
 
     def run_part0(self, feed_common, is_uncond):
         out_list_common = self.sessions[0].run(self.out_names[0], feed_common)

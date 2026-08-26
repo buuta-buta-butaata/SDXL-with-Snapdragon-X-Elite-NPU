@@ -2,6 +2,7 @@ import logging
 import os
 from argparse import ArgumentParser
 
+from .img2img import Img2ImgCommand
 from .txt2img import Txt2ImgCommand
 from .setup import SetupCommand
 from utils import get_project_root, console_colored_filter
@@ -13,6 +14,7 @@ def main():
     parser = ArgumentParser(prog="sdxlite_cli")
     commands_parser = parser.add_subparsers(title="Commands", metavar="<command>")
 
+    Img2ImgCommand.register_subcommand(commands_parser)
     Txt2ImgCommand.register_subcommand(commands_parser)
     SetupCommand.register_subcommand(commands_parser)
 

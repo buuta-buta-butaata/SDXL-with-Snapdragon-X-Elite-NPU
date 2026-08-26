@@ -503,16 +503,17 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         # Make sure sigmas and timesteps have the same device and dtype as original_samples
         # sigmas = self.sigmas.to(device=original_samples.device, dtype=original_samples.dtype)
         sigmas = self.sigmas.astype(dtype=original_samples.dtype)
-        if original_samples.device.type == "mps" and torch.is_floating_point(timesteps):
-            # mps does not support float64
-            # schedule_timesteps = self.timesteps.to(original_samples.device, dtype=torch.float32)
-            # timesteps = timesteps.to(original_samples.device, dtype=torch.float32)
-            schedule_timesteps = self.timesteps.astype(dtype=torch.float32)
-            timesteps = timesteps.astype(dtype=torch.float32)
-        else:
-            # schedule_timesteps = self.timesteps.to(original_samples.device)
-            # timesteps = timesteps.to(original_samples.device)
-            schedule_timesteps = self.timesteps
+        # if original_samples.device.type == "mps" and torch.is_floating_point(timesteps):
+        #     # mps does not support float64
+        #     # schedule_timesteps = self.timesteps.to(original_samples.device, dtype=torch.float32)
+        #     # timesteps = timesteps.to(original_samples.device, dtype=torch.float32)
+        #     schedule_timesteps = self.timesteps.astype(dtype=torch.float32)
+        #     timesteps = timesteps.astype(dtype=torch.float32)
+        # else:
+        #     # schedule_timesteps = self.timesteps.to(original_samples.device)
+        #     # timesteps = timesteps.to(original_samples.device)
+        #     schedule_timesteps = self.timesteps
+        schedule_timesteps = self.timesteps
 
         # self.begin_index is None when scheduler is used for training, or pipeline does not implement set_begin_index
         if self.begin_index is None:
@@ -526,7 +527,8 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         sigma = sigmas[step_indices].flatten()
         while len(sigma.shape) < len(original_samples.shape):
-            sigma = sigma.unsqueeze(-1)
+            # sigma = sigma.unsqueeze(-1)
+            sigma = np.expand_dims(sigma, axis=-1)
 
         noisy_samples = original_samples + noise * sigma
         return noisy_samples

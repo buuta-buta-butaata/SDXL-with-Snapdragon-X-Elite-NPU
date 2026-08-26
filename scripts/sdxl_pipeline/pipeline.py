@@ -12,6 +12,7 @@ from profilers import simple_profiler as prof
 
 logger = logging.getLogger(__name__)
 
+SCALING_FACTOR = 0.13025
 
 class BasePipeline(ABC):
     @abstractmethod
@@ -75,7 +76,7 @@ class SDXLPipeline(BasePipeline):
         # --------------------------------------------------
         # VAE decoder
         # --------------------------------------------------
-        latents = latents / 0.13025
+        latents = latents / SCALING_FACTOR
             
         profiler.start_profile("vae_decoder")
             

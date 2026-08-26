@@ -464,7 +464,8 @@ class DPMSolverSinglestepScheduler(SchedulerMixin, ConfigMixin):
         s = torch.clamp(
             s, min=1, max=self.config.sample_max_value
         )  # When clamped to min=1, equivalent to standard clipping to [-1, 1]
-        s = s.unsqueeze(1)  # (batch_size, 1) because clamp will broadcast along dim=0
+        # s = s.unsqueeze(1)  # (batch_size, 1) because clamp will broadcast along dim=0
+        s = np.expand_dims(s, axis=1)
         sample = torch.clamp(sample, -s, s) / s  # "we threshold xt0 to the range [-s, s] and then divide by s"
 
         sample = sample.reshape(batch_size, channels, *remaining_dims)
@@ -1275,12 +1276,13 @@ class DPMSolverSinglestepScheduler(SchedulerMixin, ConfigMixin):
         """
         # Make sure sigmas and timesteps have the same device and dtype as original_samples
         sigmas = self.sigmas.astype(dtype=original_samples.dtype)
-        if original_samples.device.type == "mps" and torch.is_floating_point(timesteps):
-            # mps does not support float64
-            schedule_timesteps = self.timesteps.astype(dtype=torch.float32)
-            timesteps = timesteps.astype(dtype=torch.float32)
-        else:
-            schedule_timesteps = self.timesteps
+        # if original_samples.device.type == "mps" and torch.is_floating_point(timesteps):
+        #     # mps does not support float64
+        #     schedule_timesteps = self.timesteps.astype(dtype=torch.float32)
+        #     timesteps = timesteps.astype(dtype=torch.float32)
+        # else:
+        #     schedule_timesteps = self.timesteps
+        schedule_timesteps = self.timesteps
 
         # begin_index is None when the scheduler is used for training or pipeline does not implement set_begin_index
         if self.begin_index is None:
@@ -1294,7 +1296,8 @@ class DPMSolverSinglestepScheduler(SchedulerMixin, ConfigMixin):
 
         sigma = sigmas[step_indices].flatten()
         while len(sigma.shape) < len(original_samples.shape):
-            sigma = sigma.unsqueeze(-1)
+            # sigma = sigma.unsqueeze(-1)
+            sigma = np.expand_dims(sigma, axis=-1)
 
         alpha_t, sigma_t = self._sigma_to_alpha_sigma_t(sigma)
         noisy_samples = alpha_t * original_samples + sigma_t * noise
