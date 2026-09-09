@@ -121,7 +121,7 @@ By default, the script loads the standard FP16 model. This configuration balance
 sdxlite-cli txt2img --prompt "lion"
 ```
 **Output:**
-![Lion](/output_sdxl_npu_20260816212957.png)
+![Lion](/images/output_sdxl_npu_20260816212957.png)
 
 ##### 2. Running the Quantized Model (Ultra-Low RAM)
 Pass the `--quantized_model` flag to use the optimized version, which drastically cuts down memory usage to just 2.78 GB. 
@@ -130,7 +130,7 @@ Pass the `--quantized_model` flag to use the optimized version, which drasticall
 sdxlite-cli txt2img --prompt "lion" --quantized_model --seed 3238569144
 ```
 **Output:**
-![Quantized lion](/output_sdxl_npu_20260816213036.png)
+![Quantized lion](/images/output_sdxl_npu_20260816213036.png)
 
 ##### 3. Generating Different Aspect Ratios (Experimental Weight-Shared Model)
 Standard models in this repository are locked to a 1:1 square aspect ratio (1024x1024). This limitation exists because **the model graphs must be pre-compiled (into hardware-specific formats) to achieve optimal acceleration on the Snapdragon X Elite NPU.** 
@@ -144,14 +144,14 @@ To circumvent this constraint and allow flexible dimensions like Portrait or Lan
 sdxlite-cli txt2img --prompt "epic fantasy art, 1boy, dynamic pose, mage, casting magic, blue robes, wizard hat." --quantized_model --weight_shared_model --layout Portrait
 ```
 **Output:**
-![epic fantasy art](/output_sdxl_npu_20260816221504.png)
+![epic fantasy art](/images/output_sdxl_npu_20260816221504.png)
 
 * **Landscape Mode (1344x768):**
 ```bash
 sdxlite-cli txt2img --prompt "A beautiful cyberpunk city, neon lights, high resolution, 8k, highly detailed" --quantized_model --weight_shared_model --layout Landscape
 ```
 **Output:**
-![A beautiful cyberpunk city](/output_sdxl_npu_20260816234058.png)
+![A beautiful cyberpunk city](/images/output_sdxl_npu_20260816234058.png)
 
 ##### 4. Batch Generation (Multiple Images or Multiple Prompts)
 You can automate the generation of multiple images or process an entire list of different prompts sequentially.
@@ -245,7 +245,7 @@ As visualized in the task manager's memory footprint, there is a massive dispari
 * **Left Side (Standard Model):** Normal, expected memory allocations for the Text Encoder, UNet, and VAE.
 * **Right Side (Weight-Shared Model):** An abnormal, massive RAM peak during the UNet processing loop (the center peak on the right).
 
-![task manager's memory footprint](/task_manager_memory_footprint.png)
+![task manager's memory footprint](/images/task_manager_memory_footprint.png)
 
 #### Technical Inconsistency (Process-Level vs. System-Level)
 Curiously, our internal process profiler reports that process-specific memory usage remains well within acceptable limits:
