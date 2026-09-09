@@ -6,16 +6,13 @@
 
 ## Running the image generation with ControlNet
 
-### Mode
+### Setup
 
-0: openpose
-1: depth
-2: hed/pidi/scribble/ted
-3: canny/lineart/anime_lineart/mlsd
-4: normal
-5: segment
-6: tile
-7: repaint
+#### Download the Model
+
+```bash
+sdxlite-cli.bat setup --controlnet
+```
 
 ### Execution Examples
 
