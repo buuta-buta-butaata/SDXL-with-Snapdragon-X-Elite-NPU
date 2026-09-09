@@ -5,9 +5,11 @@ import os
 
 from argparse import ArgumentParser, Namespace
 
-from . import BaseCLICommand, MyHelpFormatter, int_range, format_dict_text
+
+from . import BaseCLICommand, MyHelpFormatter, int_range, float_range, format_dict_text
+from conf import MODEL_ROOT_DIR, HELPERS_DIR
 from sdxl_pipeline import SDXLPipeline, Scheduler
-from conf import MODEL_ROOT_DIR
+from utils import required_modules as required
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +20,9 @@ class Txt2ImgCommand(BaseCLICommand):
 
     available_schedulers = Scheduler.get_available()
     available_models = dict([(i, os.path.basename(d))
-                             for i, d in enumerate(glob.glob(os.path.join(MODEL_ROOT_DIR, "*"))) if os.path.isdir(d)])
+                             for i, d in enumerate(
+                                     glob.glob(os.path.join(MODEL_ROOT_DIR, "*"))
+                             ) if os.path.isdir(d) and d != "helper"])
 
     @staticmethod
     def _register(txt2img_parser: ArgumentParser) -> None:
@@ -104,7 +108,7 @@ class Txt2ImgCommand(BaseCLICommand):
             metavar="JSON",
             help=(
                 "Scheduler custom parameters in JSON string"
-                "(e.g., '{\\\"beta_schedule\\\": \\\"linear\\\"}')."
+                "(e.g., \"{\\\"beta_schedule\\\": \\\"linear\\\"}\")."
             )
         )
         generation_group.add_argument(
@@ -169,7 +173,7 @@ class Txt2ImgCommand(BaseCLICommand):
             type=str,
             choices=submodules,
             default="",
-            metavar="MODULE",
+            # metavar="MODULE",
             help="Execute a specific pipeline submodule only, or compute UNet cosine similarity."
         )
         debug_group.add_argument(
@@ -215,11 +219,83 @@ class Txt2ImgCommand(BaseCLICommand):
         io_group.add_argument(
             "--output_prefix",
             type=str,
-            default="output_sdxl_npu_",
+            default=None,
             metavar="PREFIX",
-            help="Prefix for the saved image filenames."
+            help=(
+                "[Deprecated] Prefix for the saved image filenames.\n"
+                "Use --output_name_format instead."
+            )
         )
-    
+        io_group.add_argument(
+            "--output_name_format",
+            type=str,
+            default="sdxl_${now}_${seed}",
+            metavar="PREFIX",
+            help=(
+                "Format for the saved image filenames.\n"
+                "Parameters:"
+                "  ${now}: Current time\n"
+                "  ${prompt}: Prompt (first 15 chars)\n"
+                "  ${seed}: Seed\n"
+                "  ${cfg}: CFG\n"
+                "  ${steps}: Steps\n"
+                "  ${scheduler_type}: Scheduler type ID\n"
+            )
+        )
+
+        # ControlNet Options
+        controlnet_group = txt2img_parser.add_argument_group("ControlNet options")
+        controlnet_group.add_argument(
+            "--use_controlnet",
+            action="store_true",
+            help="[Experimental]"
+        )
+        controlnet_group.add_argument(
+            "--control_image",
+            type=str,
+            default="",
+            metavar="FILE",
+            help="[Experimental]"
+        )
+        controlnet_group.add_argument(
+            "--control_mode",
+            type=int_range(0, 8),
+            default=0,
+            metavar="INT(choose from 0-7)",
+            help=(
+                "[Experimental]\n"
+                "  0: openpose\n"
+                "  1: depth\n"
+                "  2: hed/pidi/scribble/ted\n"
+                "  3: canny/lineart/anime_lineart/mlsd\n"
+                "  4: normal\n"
+                "  5: segment\n"
+                "  6: tile\n"
+                "  7: repaint\n"
+            )
+        )
+        controlnet_group.add_argument(
+            "--control_guidance_start",
+            type=float_range(0, 1),
+            default=0.0,
+            metavar="FLOAT",
+            help="[Experimental]"
+        )
+        controlnet_group.add_argument(
+            "--control_guidance_end",
+            type=float_range(0, 1),
+            default=1.0,
+            metavar="FLOAT",
+            help="[Experimental]"
+        )
+        controlnet_group.add_argument(
+            "--control_scale",
+            type=float_range(0, 1),
+            default=1.0,
+            metavar="FLOAT",
+            help="[Experimental]"
+        )
+
     @staticmethod
     def register_subcommand(parser: ArgumentParser) -> None:
 
@@ -245,7 +321,7 @@ class Txt2ImgCommand(BaseCLICommand):
     def _validate_model_options(self, config):
         if config.weight_shared_model:
             if not config.quantized_model:
-                logger.warning("Warning: Weight-shared models currently consume about twice the model file size in RAM,"
+                logger.warning("Weight-shared models currently consume about twice the model file size in RAM,"
                                "so only quantized versions are provided.\n"
                                "Please run with '--quantized_model'. Falling back to the quantized model.")
                 config.quantized_model = True
@@ -257,7 +333,7 @@ class Txt2ImgCommand(BaseCLICommand):
             config.width = 832
             config.height = 1216
             if not config.quantized_model:
-                logger.warning("Warning: Portrait dimensions are currently only supported by weight-shared models.\n"
+                logger.warning("Portrait dimensions are currently only supported by weight-shared models.\n"
                                "Please run with '--quantized_model --weight_shared_model'."
                                "Falling back to the quantized weight-shared model.")
             config.quantized_model = True
@@ -267,7 +343,7 @@ class Txt2ImgCommand(BaseCLICommand):
             config.width = 1344
             config.height = 768
             if not config.quantized_model:
-                logger.warning("Warning: Landscape dimensions are currently only supported by weight-shared models.\n"
+                logger.warning("Landscape dimensions are currently only supported by weight-shared models.\n"
                                "Please run with '--quantized_model --weight_shared_model'."
                                "Falling back to the quantized weight-shared model.")
             config.quantized_model = True
@@ -284,7 +360,6 @@ class Txt2ImgCommand(BaseCLICommand):
         dirs = {}
 
         dirs["vae_decoder_dir"] = rf"{MODEL_ROOT_DIR}\{name}\vae_decoder\{res_str}"
-        dirs["vae_encoder_dir"] = rf"{MODEL_ROOT_DIR}\{name}\vae_encoder\{res_str}"
 
         dirs["text_encoder_dir"] = rf"{MODEL_ROOT_DIR}\{name}\text_encoder"
         dirs["text_encoder_2_dir"] =  rf"{MODEL_ROOT_DIR}\{name}\text_encoder_2"
@@ -318,6 +393,9 @@ class Txt2ImgCommand(BaseCLICommand):
                             "Please run 'sdxlite-cli setup' to repair the installation.")
             exit()
                 
+        dirs["vae_encoder_dir"] = rf"{MODEL_ROOT_DIR}\{name}\vae_encoder\{res_str}"
+        dirs["tagger_dir"] = rf"{HELPERS_DIR}\wd-vit-tagger-v3-for-Snapdragon-X-Elite"
+        dirs["controlnet_dir"] = rf"{HELPERS_DIR}\controlnet-union-sdxl-for-Snapdragon-X-Elite"
         dirs["output_dir"] = config.output_dir
         os.makedirs(config.output_dir, exist_ok=True)
 
@@ -326,8 +404,6 @@ class Txt2ImgCommand(BaseCLICommand):
 
     def _validate_torch(self, config, dirs):
         if not config.use_torch:
-            from utils import required_modules as required
-
             if not required.is_onnxextensions_lib_available(r".\lib\ortextensions.dll"):
                 logger.warning("ortextensions.dll not found.\n"
                                "Please run 'sdxlite-cli setup' or pass '--use_torch' to enable PyTorch.\n"
@@ -340,6 +416,27 @@ class Txt2ImgCommand(BaseCLICommand):
                                "Please run 'sdxlite-cli setup' or pass '--use_torch' to enable PyTorch.\n"
                                "Falling back to PyTorch for this run.")
                 config.use_torch = True
+
+        return config
+
+    def _validate_deprecated(self, config):
+        if config.output_prefix is not None:
+            logger.warning("--output_prefix is deprecated. Use --output_name_format instead.")
+            config.output_name_format = f"{config.output_prefix}_${{now}}"
+
+        return config
+
+    def _validate_controlnet(self, config):
+        if config.use_controlnet:
+            if not (required.is_controlnet_available(os.path.join(config.dirs["controlnet_dir"], "model.onnx"))):
+                logger.warning("ControlNet model not found.\n"
+                               "Please run 'sdxlite-cli setup --controlnet'.")
+                exit()
+
+            if not config.quantized_model:
+                logger.warning("ControlNet is currently only supported with quantized UNet."
+                               "Please run with '--quantized_model'. Falling back to the quantized model.")
+                config.quantized_model = True
 
         return config
 
@@ -359,6 +456,8 @@ class Txt2ImgCommand(BaseCLICommand):
         config, res_str = self._validate_layout(config)
         config, dirs = self._validate_dirs(config, res_str)
         config = self._validate_torch(config, dirs)
+        config = self._validate_deprecated(config)
+        config = self._validate_controlnet(config)
 
         self.config = config
         
@@ -388,6 +487,10 @@ class Txt2ImgCommand(BaseCLICommand):
         elif self.config.submodule == "collect_calib_data":
             from io_collector.calib_data_collector import CalibrationDataCollector
             pipe = CalibrationDataCollector(self.config)
+
+        if self.config.use_controlnet:
+            from sdxl_pipeline.unet_controlnet import UNetControlNet
+            pipe.unet = UNetControlNet(self.config)
         pipe.run()
         
         

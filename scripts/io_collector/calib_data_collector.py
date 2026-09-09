@@ -17,7 +17,8 @@ class CalibrationDataCollector(SDXLBatchPipeline):
             os.makedirs(os.path.join(self.config.output_dir, part), exist_ok=True)
 
         os.makedirs(os.path.join(self.config.output_dir, "vae_decoder"), exist_ok=True)
-        self.unet = UNetWrapper(self.config, self.config.output_dir, 0)
+        # self.unet = UNetWrapper(self.config, self.config.output_dir, 0)
+        self.unet = UNetWrapper(self.config)
         self.config.collection_strategy = 0
         self.config.current_num = 0
         self.config_list = []
@@ -49,10 +50,10 @@ class UNetWrapper(UNet):
     def is_collection_target(self, part_name, step):
         # return True
 
-        if part_name == "part1":
-            return True
-        else:
-            return False
+        # if part_name == "part1":
+        #     return True
+        # else:
+        #     return False
 
         if self.config.steps == 20:
             if self.config.collection_strategy == 1:

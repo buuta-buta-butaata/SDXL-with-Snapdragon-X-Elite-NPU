@@ -6,7 +6,13 @@ The initial goal of this project was to run Stable Diffusion XL (SDXL) models na
 Having successfully proven the core concept, this project has transitioned from a mere Proof of Concept (PoC) to a production-focused utility. Current development shifts toward maximizing practicality—focusing on memory efficiency, workflow optimizations, and delivering a fast, standalone experience for daily image generation on ARM64 Windows hardware.
 
 
-## Current Status (As of August 2026)
+## Current Status (As of September 2026)
+
+### [WIP] Image-to-Image
+**[Image-to-Image](img2img.md)**
+
+### [WIP] ControlNet
+**[ControlNet](controlnet.md)**
 
 ### 🚀 Running FP16 Models (Fully Operational)
 * **Performance (6 steps)**: ~3.92 s/it (Total time: ~34.7 seconds)

@@ -1,7 +1,8 @@
 import logging
+import numpy as np
 
 from abc import ABC, abstractmethod
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .text_processing import TextProcessing
 from .unet import UNet
@@ -28,32 +29,47 @@ class SDXLPipeline(BasePipeline):
         self.vae_decoder = None
 
     def run(self):
+        config = self.config
         logger.info("Running SDXL pipeline on NPU...")
         print(f"Prompt: {self.config.prompt}")
         # print(f"prompt_2: {self.config.prompt_2}")
         # print(f"negative prompt: {self.config.negative_prompt}")
         # print(f"negative prompt_2: {self.config.negative_prompt_2}")
+
+        if config.seed == -1:
+            config.seed = np.random.randint(np.iinfo(np.uint32).max, dtype=np.uint32)
+        logger.debug(f"seed: {config.seed}")
+        
         profiler = prof.register("pipeline")
 
         if self.text_processing is None:
-            self.text_processing = TextProcessing(self.config.dirs["text_encoder_dir"],
-                                                  self.config.dirs["tokenizer_dir"],
-                                                  self.config.dirs["text_encoder_2_dir"],
-                                                  self.config.dirs["tokenizer_2_dir"],
-                                                  self.config.use_torch)
+            self.text_processing = TextProcessing(config.dirs["text_encoder_dir"],
+                                                  config.dirs["tokenizer_dir"],
+                                                  config.dirs["text_encoder_2_dir"],
+                                                  config.dirs["tokenizer_2_dir"],
+                                                  config.use_torch)
 
         (prompt_embeds, pooled_prompt_embeds,
-         uncond_embeds, uncond_pooled_embeds) = self.text_processing.encode_text(self.config, False)
+         uncond_embeds, uncond_pooled_embeds) = self.text_processing.encode_text(self.config.prompt, self.config.prompt_2,
+                                                self.config.negative_prompt, self.config.negative_prompt_2, config, False)
         
         del self.text_processing
 
+        # --------------------------------------------------
+        # Scheduler
+        # --------------------------------------------------
+        scheduler = self.get_scheduler(config)
+        timesteps = self.set_timesteps(scheduler, config)
+        init_latents, mask_latents = self.get_init_latents(scheduler, config)
+        latents = self.prepare_latents(init_latents, scheduler, timesteps, config)
+        
         self.print_current_used_memory()
 
         if self.unet is None:
             logger.info("*" * 43)
             logger.info("Loading UNet models...")
-            self.unet = UNet(self.config)
-            self.unet.load_models(self.config)
+            self.unet = UNet(config)
+            self.unet.load_models(config)
             logger.info("  -> Loaded")
             logger.info("*" * 43)
 
@@ -61,17 +77,18 @@ class SDXLPipeline(BasePipeline):
         
         profiler.start_profile("unet")
         with ThreadPoolExecutor(max_workers=2) as executor:
-            latents = self.unet.inference(self.config, prompt_embeds, pooled_prompt_embeds,
+            latents = self.unet.inference(config, init_latents, latents, mask_latents, scheduler, timesteps,
+                                          prompt_embeds, pooled_prompt_embeds,
                                           uncond_embeds, uncond_pooled_embeds, executor)
         
         profiler.stop_profile("unet")
         del self.unet
         del prompt_embeds, pooled_prompt_embeds
-        if self.config.cfg != 1:
+        if config.cfg != 1:
             del uncond_embeds, uncond_pooled_embeds
 
-        if self.config.debug_mode:
-            image.preview_image(latents, self.config.dirs["output_dir"], self.config.output_prefix)
+        if config.debug_mode:
+            image.preview_image(latents, config.dirs["output_dir"], config.output_prefix)
 
         # --------------------------------------------------
         # VAE decoder
@@ -81,23 +98,64 @@ class SDXLPipeline(BasePipeline):
         profiler.start_profile("vae_decoder")
             
         if self.vae_decoder is None:
-            self.vae_decoder = VAEDecoder(self.config)
-        image_tensor = self.vae_decoder.decode(latents, auto_mem_free=False)
+            self.vae_decoder = VAEDecoder(config)
+        image_np = self.vae_decoder.decode(latents, auto_mem_free=False)
     
         profiler.stop_profile("vae_decoder")
 
         profiler.start_profile("pil")
-        image.output_image(image_tensor, **vars(self.config))
+        self.output_image(image_np)
         profiler.stop_profile("pil")
 
         profiler.destroy_profile_event()
 
-        if self.config.profile:
+        if config.profile:
             self.print_summary()
 
-        if self.config.debug_mode:
+        if config.debug_mode:
             from utils import check_torch_imported
             check_torch_imported()
+
+    def run_cancelable_thread(self, futures, executor):
+        results = []
+        try:
+            for future in as_completed(futures):
+                results.append(future.result())
+
+        except KeyboardInterrupt:
+            print("\nKeyboardInterrupt received — stopping immediately...")
+            executor.shutdown(wait=False, cancel_futures=True)
+            raise
+
+        return results
+
+    def get_scheduler(self, config):
+        if config.use_torch:
+            from .scheduler_torch import Scheduler
+        else:
+            from .scheduler_numpy import Scheduler
+        logger.debug(f"User input scheduler_config: {config.scheduler_config}")
+        scheduler = Scheduler(config.scheduler_type, config.seed, **config.scheduler_config)
+        # 画像のmetadata用に保持しておく
+        config.scheduler_config = vars(scheduler.config)
+        logger.debug(f"Generated scheduler_config: {config.scheduler_config}")
+        return scheduler
+
+    def get_init_latents(self, scheduler, config):
+        latents = scheduler.generate_noise_latents(config)
+        return latents, None
+
+    def set_timesteps(self, scheduler, config):
+        scheduler.set_timesteps(config.steps)
+        return scheduler.timesteps
+
+    def prepare_latents(self, init_latents, scheduler, timesteps, config):
+        init_latents = init_latents * scheduler.init_noise_sigma
+        return init_latents
+
+    def output_image(self, image_np):
+        img = image.array_to_image(image_np)
+        image.save(img, **vars(self.config))
 
     def print_current_used_memory(self, output_func=logger.info):
         total, used, available, percent = prof.get_current_memory_info()

@@ -38,14 +38,14 @@ class SDXLPipelineVAEDecoderOnly(BasePipeline):
         data = npio.load(file_path).item()
         latents = data["latents"] / 0.13025
 
-        image_tensor = vae_decoder.decode(latents, auto_mem_free=False)
+        image_np = vae_decoder.decode(latents, auto_mem_free=False)
         config = data["config"]
 
         output_dir = self.config.output_dir # self.config!
         os.makedirs(output_dir, exist_ok=True)
         config.output_dir = output_dir
-        
-        image.output_image(image_tensor, **vars(config))
+
+        image.save(image_np, **vars(config))
         # if i % 10 == 9:
         #     time.sleep(2)
 

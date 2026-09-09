@@ -13,7 +13,7 @@ class VAEDecoder:
         self.model = None
         self.onnx_path = self.find_model_path(config.dirs["vae_decoder_dir"],
                                               config.width, config.height)
-
+        
     def find_model_path(self, model_dir, width, height):
         single_graph_model = os.path.join(model_dir, "model.onnx")
         if os.path.exists(single_graph_model):
@@ -23,6 +23,9 @@ class VAEDecoder:
             return model_path
         return os.path.join(model_dir, f"{width}x{height}", "model.onnx")
 
+    def load_model(self, config):
+        self.model = ort.InferenceSession(self.onnx_path, sess_options=qnn.session_options)
+        
     def decode(self, latents: np.ndarray, auto_mem_free=True):
         logger.info("Decoding with VAE...")
         if latents.dtype != np.float16:

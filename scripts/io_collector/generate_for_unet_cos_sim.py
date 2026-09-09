@@ -1,15 +1,16 @@
 import glob
+import numpy as np
 import os
 
 from concurrent.futures import ThreadPoolExecutor
 
-from sdxl_pipeline import BasePipeline
+from sdxl_pipeline import SDXLPipeline
 from sdxl_pipeline.unet import UNet
 from . import numpy_io as npio
 
 FILE_PREFIX = "cos_sim_"
 
-class UNetCosSim(BasePipeline):
+class UNetCosSim(SDXLPipeline):
     def __init__(self, sdxl_config):
         self.config = sdxl_config
 
@@ -22,22 +23,30 @@ class UNetCosSim(BasePipeline):
                 print(f"Deleted: {file}")
 
     def run(self):
-        output_dir = self.config.output_dir
+        config = self.config
+        output_dir = config.output_dir
         os.makedirs(output_dir, exist_ok=True)
 
         self.clear_dir()
         
-        unet = UNetWrapper(self.config, output_dir)
-        unet.load_models(self.config)
-        file_path = self.config.input_file
+        unet = UNetWrapper(config, output_dir)
+        unet.load_models(config)
+        file_path = config.input_file
 
+        if config.seed == -1:
+            config.seed = np.random.randint(np.iinfo(np.uint32).max, dtype=np.uint32)
         with ThreadPoolExecutor(max_workers=2) as executor:
             print(file_path)
             data = npio.load(file_path).item()
 
-            latents = unet.inference(self.config, data["pos_embeds"], data["pos_pooled"],
+            scheduler = self.get_scheduler(config)
+            timesteps = self.set_timesteps(scheduler, config)
+            init_latents, mask_latents = self.get_init_latents(scheduler, config)
+            latents = self.prepare_latents(init_latents, scheduler, timesteps, config)
+            latents = unet.inference(config, init_latents, latents, mask_latents, scheduler, timesteps,
+                                     data["pos_embeds"], data["pos_pooled"],
                                      data["neg_embeds"], data["neg_pooled"], executor)
-            npio.save(output_dir, f"{FILE_PREFIX}latents_{self.config.seed}_", latents)
+            npio.save(output_dir, f"{FILE_PREFIX}latents_{config.seed}_", latents)
             
                 
 

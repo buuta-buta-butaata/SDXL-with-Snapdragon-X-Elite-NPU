@@ -19,7 +19,10 @@ class SDXLPipelineTextOnly(BasePipeline):
         self.config.prompt = prompt
         self.config.prompt_2 = prompt
         (prompt_embeds, pooled_prompt_embeds,
-         uncond_embeds, uncond_pooled_embeds) = text_processing.encode_text(self.config, auto_mem_free=False)
+         uncond_embeds, uncond_pooled_embeds) = text_processing.encode_text(self.config.prompt, self.config.prompt_2,
+                                                                            self.config.negative_prompt,
+                                                                            self.config.negative_prompt_2,
+                                                                            self.config, auto_mem_free=False)
 
         outputs = {"prompt":prompt,
                    "negative_prompt": self.config.negative_prompt,

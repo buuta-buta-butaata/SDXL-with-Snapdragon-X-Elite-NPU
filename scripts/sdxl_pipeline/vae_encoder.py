@@ -23,6 +23,8 @@ class VAEEncoder:
             return model_path
         return os.path.join(model_dir, f"{width}x{height}", "model.onnx")
 
+    def load_model(self, config):
+        self.model = ort.InferenceSession(self.onnx_path, sess_options=qnn.session_options)
 
     def encode(self, preprocessed_image: np.ndarray, auto_mem_free=True):
         logger.info("Encoding with VAE...")

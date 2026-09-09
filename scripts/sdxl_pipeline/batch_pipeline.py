@@ -1,4 +1,5 @@
 import logging
+import numpy as np
 import os
 
 from concurrent.futures import ThreadPoolExecutor
@@ -54,12 +55,14 @@ class SDXLBatchPipeline(SDXLPipeline):
         del self.text_processing
 
         with ThreadPoolExecutor(max_workers=2) as executor:
-            self._run(text_embeds_list, executor)
+            self._run(text_embeds_list, self.config, executor)
 
     def _run_text_processing(self):
-        return self.text_processing.encode_text(self.config, False)
+        return self.text_processing.encode_text(self.config.prompt, self.config.prompt_2,
+                                                self.config.negative_prompt, self.config.negative_prompt_2,
+                                                self.config, False)
         
-    def _run(self, text_embeds_list, executor):
+    def _run(self, text_embeds_list, config, executor):
         random_seed = self.config.seed == -1
         latents_list = []
         seed_list = []
@@ -76,37 +79,47 @@ class SDXLBatchPipeline(SDXLPipeline):
         # Image saved to: {filepath}
         
         all_count = len(text_embeds_list) * self.config.batch_count
-        current_num = 1
-        for (prompt_embeds, pooled_prompt_embeds, uncond_embeds, uncond_pooled_embeds) in text_embeds_list:
-            self.set_unet_config(self.config, current_num)
+        count = 1
+        for lineno, (prompt_embeds, pooled_prompt_embeds,
+                     uncond_embeds, uncond_pooled_embeds) in enumerate(text_embeds_list, 1):
+            self.set_unet_config(self.config, lineno)
+        
             for i in range(0, self.config.batch_count):
-                print(f"[{current_num}/{all_count}] Denoising with UNet...")
-                latents = self.unet.inference(self.config, prompt_embeds, pooled_prompt_embeds,
+                if config.seed == -1:
+                    config.seed = np.random.randint(np.iinfo(np.uint32).max, dtype=np.uint32)
+                
+                scheduler = self.get_scheduler(config)
+                timesteps = self.set_timesteps(scheduler, config)
+                init_latents, mask_latents = self.get_init_latents(scheduler, config)
+                latents = self.prepare_latents(init_latents, scheduler, timesteps, config)
+                
+                print(f"[{count}/{all_count}] Denoising with UNet...")
+                latents = self.unet.inference(self.config, init_latents, latents, mask_latents, scheduler, timesteps,
+                                              prompt_embeds, pooled_prompt_embeds,
                                               uncond_embeds, uncond_pooled_embeds, executor)
         
                 latents = latents / SCALING_FACTOR
-                # image_tensor = self.vae_decoder.decode(latents, auto_mem_free=False)
-                # image.output_image(image_tensor, **vars(self.config))
+                # image_np = self.vae_decoder.decode(latents, auto_mem_free=False)
+                # image.save(image_np, **vars(self.config))
                 latents_list.append(latents)
 
                 if random_seed:
                     seed_list.append(self.config.seed)
                     self.config.seed = -1
-                current_num += 1
+
+                count += 1
 
             del prompt_embeds, pooled_prompt_embeds, uncond_embeds, uncond_pooled_embeds
 
         print("")
         del self.unet
 
-        current_num = 1
         for i, latents in enumerate(latents_list):
-            print(f"[{current_num}/{all_count}] Decoding VAE & saving image...")
+            print(f"[{i+1}/{all_count}] Decoding VAE & saving image...")
             self.config.seed = seed_list[i]
-            self.set_vae_decoder_config(self.config, current_num);
-            image_tensor = self.vae_decoder.decode(latents, auto_mem_free=False)
-            image.output_image(image_tensor, **vars(self.config))
-            current_num += 1
+            self.set_vae_decoder_config(self.config, i+1);
+            image_np = self.vae_decoder.decode(latents, auto_mem_free=False)
+            image.save(image_np, **vars(self.config))
             
 if __name__ == "__main__":
     from types import SimpleNamespace

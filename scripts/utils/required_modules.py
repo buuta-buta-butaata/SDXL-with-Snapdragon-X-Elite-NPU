@@ -28,6 +28,9 @@ def is_onnxextensions_lib_available(path: str) -> bool:
 def is_onnx_tokenizer_available(path: str) -> bool:
     return os.path.isfile(path)
 
+def is_controlnet_available(path: str) -> bool:
+    return os.path.isfile(path)
+
 
 if __name__ == "__main__":
     print(is_onnx_tokenizer_available(r"..\compiled_models\single\dsxl\tokenizer\tokenizer.onnx"))

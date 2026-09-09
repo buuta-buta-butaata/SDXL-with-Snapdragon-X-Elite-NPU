@@ -7,25 +7,32 @@ from datetime import datetime
 
 from io_collector import numpy_io as npio
 from io_collector.generate_for_unet_cos_sim import FILE_PREFIX
-from sdxl_pipeline import BasePipeline, image
+from sdxl_pipeline import SDXLPipeline, image
 from sdxl_pipeline.unet import UNet
 from sdxl_pipeline.vae_decoder import VAEDecoder
 
-class UNetCosSim(BasePipeline):
+class UNetCosSim(SDXLPipeline):
     def __init__(self, sdxl_config):
         self.config = sdxl_config
 
     def all_run(self):
-        file_path = self.config.input_file
-        input_dir = self.config.input_dir
+        config = self.config
+        file_path = config.input_file
+        input_dir = config.input_dir
         fp16_output_file = sorted(glob.glob(os.path.join(input_dir, f"{FILE_PREFIX}*.npy")))[-2]
         seed = int(fp16_output_file.split("_")[-2])
-        self.config.seed = seed
+        config.seed = seed
         
         with ThreadPoolExecutor(max_workers=2) as executor:
             data = npio.load(file_path).item()
 
-            latents = self.unet.inference(self.config, data["pos_embeds"], data["pos_pooled"],
+            scheduler = self.get_scheduler(config)
+            timesteps = self.set_timesteps(scheduler, config)
+            init_latents, mask_latents = self.get_init_latents(scheduler, config)
+            latents = self.prepare_latents(init_latents, scheduler, timesteps, config)
+            
+            latents = self.unet.inference(config, init_latents, latents, mask_latents, scheduler, timesteps,
+                                          data["pos_embeds"], data["pos_pooled"],
                                           data["neg_embeds"], data["neg_pooled"], executor)
             outputs = self.unet.result_part4
 
@@ -39,16 +46,16 @@ class UNetCosSim(BasePipeline):
         fp16_latents_file = sorted(glob.glob(os.path.join(input_dir, f"{FILE_PREFIX}latents*.npy")))[-1]
         fp16_latents = npio.load(fp16_latents_file)
 
-        vae_decoder = VAEDecoder(self.config)
+        vae_decoder = VAEDecoder(config)
         fp16_latents = fp16_latents / 0.13025
-        image_tensor = vae_decoder.decode(fp16_latents, auto_mem_free=False)
-        self.config.output_prefix = "orig_output_"
-        image.output_image(image_tensor, **vars(self.config))
+        image_np = vae_decoder.decode(fp16_latents, auto_mem_free=False)
+        config.output_prefix = "orig_output_"
+        image.save(image_np, **vars(config))
         
         latents = latents / 0.13025
-        image_tensor = vae_decoder.decode(latents, auto_mem_free=False)
-        self.config.output_prefix = "quantized_output_"
-        image.output_image(image_tensor, **vars(self.config))
+        image_np = vae_decoder.decode(latents, auto_mem_free=False)
+        config.output_prefix = "quantized_output_"
+        image.save(image_np, **vars(config))
 
     def write(self):
         filename = f"log_{datetime.now().strftime('%Y%m%d%H%M%S%f')[:-3]}.txt"

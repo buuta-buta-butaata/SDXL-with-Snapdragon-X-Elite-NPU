@@ -29,14 +29,15 @@ class TextProcessing:
     
         return prompt_embeds, pooled_prompt_embeds
 
-    def encode_text(self, config, auto_mem_free=True):
+    def encode_text(self, prompt, prompt_2, negative_prompt, negative_prompt_2, config,
+                    auto_mem_free=True, return_uncond=True):
         logger.info("Encoding text...")
         prompt_embeds, pooled_prompt_embeds = self._encode_text(
-            config.prompt, config.prompt_2, is_uncond=False)
+            prompt, prompt_2, is_uncond=False)
         
-        if config.cfg != 1:
+        if config.cfg != 1 and return_uncond:
             uncond_embeds, uncond_pooled_embeds = self._encode_text(
-                config.negative_prompt, config.negative_prompt_2, is_uncond=True)
+                negative_prompt, negative_prompt_2, is_uncond=True)
         else:
             uncond_embeds, uncond_pooled_embeds = None, None
 
@@ -46,7 +47,5 @@ class TextProcessing:
         return prompt_embeds, pooled_prompt_embeds, uncond_embeds, uncond_pooled_embeds
 
     def free_memory(self):
-        if self.text_encoder:
-            self.text_encoder.free_memory()
-        if self.text_encoder_2:
-            self.text_encoder_2.free_memory()
+        self.text_encoder.free_memory()
+        self.text_encoder_2.free_memory()

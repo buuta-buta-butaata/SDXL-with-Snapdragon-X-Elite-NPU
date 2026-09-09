@@ -1,29 +1,40 @@
 import glob
 import logging
+import numpy as np
 import os
 import time
 
 from concurrent.futures import ThreadPoolExecutor
 
 from profilers import simple_profiler as prof
-from sdxl_pipeline import BasePipeline
+from sdxl_pipeline import SDXLPipeline
 from sdxl_pipeline.unet import UNet
 from . import numpy_io as npio
 
 logger = logging.getLogger(__name__)
 
 
-class SDXLPipelineUNetOnly(BasePipeline):
+class SDXLPipelineUNetOnly(SDXLPipeline):
     def __init__(self, sdxl_config):
         self.config = sdxl_config
         prof.available = False
 
     def _run(self, unet, file_path, output_dir, executor):
+        config = self.config
         print(f"Denoising: {file_path}")
         data = npio.load(file_path).item()
 
+        if self.config.seed == -1:
+            self.config.seed = np.random.randint(np.iinfo(np.uint32).max, dtype=np.uint32)
+
+        scheduler = self.get_scheduler(self.config)
+        timesteps = self.set_timesteps(scheduler, config)
+        init_latents, mask_latents = self.get_init_latents(scheduler, config)
+        latents = self.prepare_latents(init_latents, scheduler, timesteps, config)
+        
         # backup_scheduler_config = self.config.scheduler_config
-        latents = unet.inference(self.config, data["pos_embeds"], data["pos_pooled"],
+        latents = unet.inference(self.config, init_latents, latents, mask_latents, scheduler, timesteps,
+                                 data["pos_embeds"], data["pos_pooled"],
                                  data["neg_embeds"], data["neg_pooled"], executor)
 
         self.config.prompt = data["prompt"]

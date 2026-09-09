@@ -47,32 +47,20 @@ class UNet:
             return single_graph_model
         return os.path.join(model_dir, f"unet_{part}_{width}x{height}.onnx")
 
-    def inference(self, config, prompt_embeds, pooled_prompt_embeds,
-                  uncond_embeds, uncond_pooled_embeds, executor):
+    def inference(self, config, init_latents, latents, mask_latents, scheduler, timesteps,
+                  prompt_embeds, pooled_prompt_embeds,
+                  uncond_embeds, uncond_pooled_embeds, executor,
+                  original_size=None,
+                  crops_coords=(0, 0),
+                  target_size=None):
 
         prof.register("unet")
 
-        if config.seed == -1:
-            config.seed = np.random.randint(np.iinfo(np.uint32).max, dtype=np.uint32)
-        logger.debug(f"seed: {config.seed}")
-        
-        # --------------------------------------------------
-        # Scheduler
-        # --------------------------------------------------
-        if config.use_torch:
-            from .scheduler_torch import Scheduler
-        else:
-            from .scheduler_numpy import Scheduler
-        logger.debug(f"User input scheduler_config: {config.scheduler_config}")
-        scheduler = Scheduler(config.scheduler_type, config.seed, **config.scheduler_config)
-        scheduler.set_timesteps(config.steps)
-        # 画像のmetadata用に保持しておく
-        config.scheduler_config = vars(scheduler.config)
-        logger.debug(f"Generated scheduler_config: {config.scheduler_config}")
+        if original_size is None:
+            original_size = (config.height, config.width)
+        if target_size is None:
+            target_size = (config.height, config.width)
 
-        init_latents = self.get_init_latents(scheduler, config)
-        latents, timesteps = self.prepare_latents(init_latents, scheduler, config)
-        
         # --------------------------------------------------
         # Denoise
         # --------------------------------------------------
@@ -84,9 +72,7 @@ class UNet:
         if len(self.sessions) == 0:
             self.load_models(config)
 
-        add_time_ids = np.array([[config.height, config.width,
-                                  0, 0,
-                                  config.height, config.width]], dtype=self.part0_type)
+        add_time_ids = self.set_add_time_ids(original_size, crops_coords, target_size, self.part0_type)
 
         base_inputs = {
             "text_embeds": pooled_prompt_embeds.astype(self.part0_type),
@@ -98,7 +84,9 @@ class UNet:
                 "text_embeds": uncond_pooled_embeds.astype(self.part0_type),
                 "time_ids": add_time_ids
             }
-    
+
+        self.preprocess(config)
+        
         for i, t in enumerate(tqdm(timesteps)):
             # タイムステップをUNetが要求する形状 [1] のfloat32配列にする
             timestep = np.array([t.item()], dtype=np.float32)
@@ -131,23 +119,24 @@ class UNet:
                                           base_inputs, encoder_hidden_states)[0].astype(np.float32)
         
             latents = scheduler.step(noise_pred, timestep, latents).prev_sample
-            latents = self.add_noise(latents, scheduler, timestep, config)
+            if i < len(timesteps) - 1:
+                noise_timestep = timesteps[i + 1]
+                latents = self.add_noise(init_latents, latents, mask_latents, scheduler, noise_timestep, config)
 
         prof.get("unet").destroy_profile_event()
 
         return latents
 
-    def add_noise(self, latents, scheduler, timestep, config):
+    def preprocess(self, config):
+        pass
+
+    def set_add_time_ids(self, original_size, crops_coords, target_size, dtype):
+        add_time_ids = np.array([list(original_size + crops_coords + target_size)], dtype=dtype)
+        return add_time_ids
+
+    def add_noise(self, init_latents, latents, mask_latents, scheduler, timestep, config):
         return latents
     
-    def get_init_latents(self, scheduler, config):
-        latents = scheduler.generate_noise_latents(config)
-        return latents
-
-    def prepare_latents(self, init_latents, scheduler, config):
-        init_latents = init_latents * scheduler.init_noise_sigma
-        return init_latents, scheduler.timesteps
-
     def run_part0(self, feed_common, is_uncond):
         out_list_common = self.sessions[0].run(self.out_names[0], feed_common)
         return out_list_common[0].astype(np.float16)
