@@ -91,7 +91,7 @@ image_gen.bat "A beautiful cyberpunk city, neon lights, high resolution, 8k, hig
 ```
 
 結果1:
-![A beautiful cyberpunk city, neon lights, high resolution, 8k, highly detailed](/output_sdxl_npu20260612234103.png)
+![A beautiful cyberpunk city, neon lights, high resolution, 8k, highly detailed](/images/output_sdxl_npu20260612234103.png)
 
 実行例2:
 ```
@@ -99,7 +99,7 @@ image_gen.bat "lion"
 ```
 
 結果2:
-![lion](/output_sdxl_npu20260613005411.png)
+![lion](/images/output_sdxl_npu20260613005411.png)
 
 ちなみに
 ```

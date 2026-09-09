@@ -1,6 +1,6 @@
 # ComfyUI Custom Nodes: OnnxRuntime-QNN-Nodes
 
-![Custom nodes screenshot](/custom_nodes_screenshot.png)
+![Custom nodes screenshot](/images/custom_nodes_screenshot.png)
 
 ## What is this?
 
