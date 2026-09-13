@@ -6,7 +6,7 @@ onnxruntime-qnn==2.4.0
 onnxruntime==1.28.0
 onnxscript==0.6.2
 psutil==7.2.2
-safetensors==0.7.0
+safetensors==0.8.0
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.10.0+cpu
 torchvision==0.25.0+8ac84ee
