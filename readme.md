@@ -31,13 +31,23 @@ Having successfully proven the core concept, this project has transitioned from 
 * **Note on Development**: Since our current development heavily prioritizes a completely torch-less, standalone CLI architecture to maximize NPU efficiency, updating these ComfyUI nodes is currently a lower priority.
 * **Details**: For the implementation guide, setup script, and known limitations, please check out the dedicated documentation here: **[ComfyUI Custom Nodes: OnnxRuntime-QNN-Nodes](custom_nodes.md)**
 
+### 📊 UNet Performance Benchmark
+* **Conditions**: Resolution: `1024x1024`, CFG Scale: `> 1.0`, Steps: `6`
+
+| SoC Generation | Model Type | Precision | Performance (6 steps) | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Snapdragon X Elite** | FP16 (Standard) | Float16 | ~3.92 s/it | Default Baseline |
+| **Snapdragon X Elite** | Quantized (Enhanced) | Int8 (W8A16) | ~2.00 s/it | Optimized for NPU |
+| **Snapdragon X2 Elite** | FP16 (Standard) | Float16 | **~1.79 s/it** | 🚀 **Community Confirmed!** (More than 2x faster) |
+| *Snapdragon X2 Elite* | *Quantized (Enhanced)* | *Int8 (W8A16)* | *TBD* | *(Expected to be even faster!)* |
 
 ## Getting Started
 
 ### Prerequisites
 
 #### System Requirements
-* **SoC**: Snapdragon X Elite (Strictly required, as the project is optimized specifically for this architecture).
+* **SoC**: Snapdragon X Elite / X2 Elite
+  *(Note: The models are optimized for X Elite, but the next-gen X2 Elite has been confirmed by the community to be fully backward-compatible and runs more than 2x faster at ~1.79s/it!)*
 * **OS**: Windows 11 (ARM64).
 * **Python**: Python 3.13.x (ARM64 Native).
   * *Note: While it should theoretically run on Linux with minor script modifications, this repository currently only supports Windows.*
