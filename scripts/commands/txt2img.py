@@ -326,6 +326,12 @@ class Txt2ImgCommand(BaseCLICommand):
                                "Please run with '--quantized_model'. Falling back to the quantized model.")
                 config.quantized_model = True
 
+        if config.use_controlnet:
+            if not config.quantized_model:
+                logger.warning("ControlNet is currently only supported with quantized UNet."
+                               "Please run with '--quantized_model'. Falling back to the quantized model.")
+                config.quantized_model = True
+
         return config
         
     def _validate_layout(self, config):
@@ -367,6 +373,8 @@ class Txt2ImgCommand(BaseCLICommand):
         dirs["tokenizer_2_dir"] = rf"{MODEL_ROOT_DIR}\{name}\tokenizer_2"
 
         if config.quantized_model:
+            # dirs["text_encoder_dir"] = rf"{MODEL_ROOT_DIR}\{name}\text_encoder_w8a16_quantized"
+            # dirs["text_encoder_2_dir"] =  rf"{MODEL_ROOT_DIR}\{name}\text_encoder_2_w8a16_quantized"
             dirs["unet_dir"] = rf"{MODEL_ROOT_DIR}\{name}\unet_w8a16_quantized"
             if config.weight_shared_model:
                 dirs["unet_dir"] = rf"{MODEL_ROOT_DIR}\{name}\unet_w8a16_weight_shared"
@@ -433,11 +441,6 @@ class Txt2ImgCommand(BaseCLICommand):
                                "Please run 'sdxlite-cli setup --controlnet'.")
                 exit()
 
-            if not config.quantized_model:
-                logger.warning("ControlNet is currently only supported with quantized UNet."
-                               "Please run with '--quantized_model'. Falling back to the quantized model.")
-                config.quantized_model = True
-
         return config
 
     def __init__(self, args):
@@ -456,8 +459,8 @@ class Txt2ImgCommand(BaseCLICommand):
         config, res_str = self._validate_layout(config)
         config, dirs = self._validate_dirs(config, res_str)
         config = self._validate_torch(config, dirs)
-        config = self._validate_deprecated(config)
         config = self._validate_controlnet(config)
+        config = self._validate_deprecated(config)
 
         self.config = config
         
