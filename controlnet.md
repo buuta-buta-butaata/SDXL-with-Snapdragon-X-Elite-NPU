@@ -36,6 +36,26 @@ sdxlite-cli.bat txt2img --quantized_model --prompt "ninja" --control_image "jump
 
 ---
 
+#### mode 1(Depth)
+**Input:**  
+<img src="images/depth.png" width="50%" />
+```bash
+sdxlite-cli.bat txt2img --quantized_model --prompt "bear" --control_image "depth.png" --control_mode 1 --control_scale 0.3 --use_controlnet
+```
+**Output:**  
+<img src="images/bear.png" width="50%" />
+
+##### Key parameters
+```
+--control_image "depth.png"
+--control_mode 1
+--control_scale 0.3
+--use_controlnet
+```
+
+---
+
+
 #### mode 2(Scribble)
 **Input:**  
 <img src="images/pose_mode2.png" width="50%" />
@@ -75,6 +95,26 @@ sdxlite-cli.bat txt2img --quantized_model --prompt "red robot" --control_image "
 ```
 
 ---
+
+#### mode 4(Normal)
+**Input:**  
+<img src="images/normalmap_ninja.png" width="50%" />
+```bash
+sdxlite-cli.bat txt2img --quantized_model --prompt "red ninja" --control_image "normalmap_ninja.png" --control_mode 4 --control_guidance_end 1 --steps 5 --control_scale 0.4 --use_controlnet
+```
+**Output:**  
+<img src="images/red_ninja.png" width="50%" />
+
+##### Key parameters
+```
+--control_image "normalmap_ninja.png"
+--control_mode 4
+--control_scale 0.4
+--use_controlnet
+```
+
+---
+
 
 #### mode 6(Tile)
 **Input:**  
