@@ -115,6 +115,26 @@ sdxlite-cli.bat txt2img --quantized_model --prompt "red ninja" --control_image "
 
 ---
 
+#### mode 5(Segment)
+**Input:**  
+<img src="images/room_mode5.png" width="50%" />
+```bash
+sdxlite-cli.bat txt2img --quantized_model --prompt "flowery room, large window, sunlight" --control_image room_mode5.png --control_mode 5 --control_guidance_end 1 --control_scale 0.4 --use_controlnet
+```
+**Output:**  
+<img src="images/flowery_room.png" width="50%" />
+
+##### Key parameters
+```
+--control_image room_mode5.png
+--control_mode 5
+--control_guidance_end 1
+--control_scale 0.4
+--use_controlnet
+```
+
+---
+
 
 #### mode 6(Tile)
 **Input:**  
@@ -133,3 +153,27 @@ sdxlite-cli.bat img2img --quantized_model --prompt "red robot" --input_image "ou
 --control_scale 0.2-0.4
 --use_controlnet
 ```
+
+---
+
+#### mode 7(Repaint)
+**Input:**  
+<img src="images/output_sdxl_npu_20260905190729.png" width="50%" />
+<img src="images/inpaint.png" width="50%" />
+<img src="images/inpaint_mask.png" width="50%" />
+```bash
+sdxlite-cli.bat img2img --quantized_model --prompt "Flying bird in forest" --input_image output_sdxl_npu_20260905190729.png --control_mode 7 --control_guidance_end 1 --control_scale 0.3 --use_controlnet --mask_image inpaint_mask.png --control_image inpaint.png
+```
+**Output:**  
+<img src="images/flying_bird.png" width="50%" />
+
+##### Key parameters
+```
+--control_mode 7
+--control_guidance_end 1
+--control_scale 0.3
+--use_controlnet
+--mask_image inpaint_mask.png
+--control_image inpaint.png
+```
+
