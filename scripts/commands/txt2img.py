@@ -251,6 +251,11 @@ class Txt2ImgCommand(BaseCLICommand):
             help="[Experimental]"
         )
         controlnet_group.add_argument(
+            "--use_fp16_controlnet",
+            action="store_true",
+            help="[Experimental]"
+        )
+        controlnet_group.add_argument(
             "--control_image",
             type=str,
             default="",
@@ -380,10 +385,15 @@ class Txt2ImgCommand(BaseCLICommand):
                 dirs["unet_dir"] = rf"{MODEL_ROOT_DIR}\{name}\unet_w8a16_weight_shared"
             dirs["unet_dir_fp16"] = rf"{MODEL_ROOT_DIR}\{name}\unet"
             config.unet_fp16 = ["part0"]
+            dirs["controlnet_dir"] = rf"{HELPERS_DIR}\controlnet-union-sdxl-for-Snapdragon-X-Elite"
         else:
             dirs["unet_dir"] = rf"{MODEL_ROOT_DIR}\{name}\unet"
             dirs["unet_dir_fp16"] = rf"{MODEL_ROOT_DIR}\{name}\unet"
             config.unet_fp16 = ["part0"]
+            dirs["controlnet_dir"] = rf"{HELPERS_DIR}\controlnet-union-sdxl-for-Snapdragon-X-Elite\fp16"
+
+        if config.use_fp16_controlnet:
+            dirs["controlnet_dir"] = rf"{HELPERS_DIR}\controlnet-union-sdxl-for-Snapdragon-X-Elite\fp16"
 
         for part in config.fp16_part:
             if part > 0 and part < 5:
@@ -403,7 +413,6 @@ class Txt2ImgCommand(BaseCLICommand):
                 
         dirs["vae_encoder_dir"] = rf"{MODEL_ROOT_DIR}\{name}\vae_encoder\{res_str}"
         dirs["tagger_dir"] = rf"{HELPERS_DIR}\wd-vit-tagger-v3-for-Snapdragon-X-Elite"
-        dirs["controlnet_dir"] = rf"{HELPERS_DIR}\controlnet-union-sdxl-for-Snapdragon-X-Elite"
         dirs["output_dir"] = config.output_dir
         os.makedirs(config.output_dir, exist_ok=True)
 
@@ -487,6 +496,11 @@ class Txt2ImgCommand(BaseCLICommand):
         elif self.config.submodule == "compute_unet_cos_sim":
             from profilers.compute_unet_cos_sim import UNetCosSim
             pipe = UNetCosSim(self.config)
+        elif self.config.submodule == "collect_calib_data" and self.config.use_controlnet:
+            from io_collector.calib_data_collector_controlnet import CalibrationDataCollectorForControlNet
+            pipe = CalibrationDataCollectorForControlNet(self.config)
+            pipe.run()
+            exit()
         elif self.config.submodule == "collect_calib_data":
             from io_collector.calib_data_collector import CalibrationDataCollector
             pipe = CalibrationDataCollector(self.config)

@@ -27,12 +27,16 @@ class TextEncoder2:
         self.model_2 = ort.InferenceSession(self.model_path, qnn.session_options)
         self.tokenizer_2 = self.Tokenizer(self.tokenizer_2_path)
 
-    def get_text_embeddings_2(self, prompt: str, auto_mem_free=True):
+    def get_tokens(self, prompt, auto_mem_free, is_uncond=False):
         if self.tokenizer_2 is None:
             self.tokenizer_2 = self.Tokenizer(self.tokenizer_2_path)
 
         input_ids_2 = self.tokenizer_2.run(prompt, auto_mem_free, 0)
         inputs = {"input_ids": input_ids_2}
+        return inputs
+        
+    def get_text_embeddings_2(self, prompt: str, auto_mem_free=True, is_uncond=False):
+        inputs = self.get_tokens(prompt, auto_mem_free, is_uncond)
 
         if self.model_2 is None:
             self.load_models()

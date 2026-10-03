@@ -25,8 +25,9 @@ class Img2ImgCommand(Txt2ImgCommand):
 
         Img2ImgCommand._register(img2img_parser)
 
-        modify_parser_action(img2img_parser, "--prompt", help="The prompt to guide image generation / inpainting.",
-                             required=True)
+        modify_parser_action(img2img_parser, "--prompt",
+                             required=True,
+                             help="The prompt to guide image generation / inpainting.")
 
         modify_parser_action(img2img_parser, "--layout", help="Not supported")
         modify_parser_action(img2img_parser, "--weight_shared_model", help="Not supported")
@@ -38,12 +39,13 @@ class Img2ImgCommand(Txt2ImgCommand):
 
         generation_group = img2img_parser.add_argument_group("Img2Img generation options")
         generation_group.add_argument(
-            "--input_image", type=str, required=True, 
+            "--input_image", type=str,
+            required=True, 
             metavar="PATH",
             help="Path to the input source image."
         )
         generation_group.add_argument(
-            "--denoising_strength", type=float_range(0, 1), default=0.6, 
+            "--denoising_strength", type=float_range(0, 1), default=1.0,
             metavar="FLOAT",
             help="Denoising strength (0.0 to 1.0). Controls how much to transform the input image."
         )
@@ -87,6 +89,26 @@ class Img2ImgCommand(Txt2ImgCommand):
         if self.config.width != 1024 or self.config.height != 1024:
             logger.warning("img2img only support 1024x1024, resized input image")
         
+        if self.config.submodule == "collect_calib_data" and self.config.use_controlnet:
+            if self.config.control_mode == 6:
+                from sdxl_pipeline.pipeline_tiled_img2img import SDXLTiledImg2ImgPipelineForCalib
+                pipe = SDXLTiledImg2ImgPipelineForCalib(self.config)
+                pipe.run()
+                return
+            elif self.config.control_mode == 7:
+                from io_collector.calib_data_collector_controlnet import UNetWrapper
+                setattr(self.config, "collection_strategy", 3)
+        
+                from sdxl_pipeline.pipeline_inpaint import SDXLInpaintPipeline
+                pipe = SDXLInpaintPipeline(self.config)
+                pipe.unet = UNetWrapper(self.config)
+                pipe.run()
+                return
+            else:
+                from io_collector.calib_data_collector_controlnet import CalibrationDataCollectorForControlNet
+                pipe = CalibrationDataCollectorForControlNet(self.config)
+                pipe.run()
+                return
         if self.config.mask_image is not None:
             from sdxl_pipeline.pipeline_inpaint import SDXLInpaintPipeline
             pipe = SDXLInpaintPipeline(self.config)

@@ -59,9 +59,7 @@ class SDXLTiledImg2ImgPipeline(SDXLImg2ImgPipeline):
                                          int(base_image.size[1] * config.upscale_factor)),
                                         resample=Image.Resampling.LANCZOS)
 
-        original_size = (large_image.height, large_image.width)
-
-        tiles_info = image.split_into_tiles(large_image, tile_size=(config.width, config.height))
+        tiles_info, original_size = image.split_into_tiles(large_image, tile_size=(config.width, config.height))
 
         all_count = len(tiles_info)
         tiled_latents_info = []
@@ -118,7 +116,7 @@ class SDXLTiledImg2ImgPipeline(SDXLImg2ImgPipeline):
         ]
         processed_tiles_info = self.run_cancelable_thread(futures, executor)
 
-        high_res_image = image.merge_tiles(processed_tiles_info, canvas_size=large_image.size)
+        high_res_image = image.merge_tiles(processed_tiles_info, canvas_size=original_size)
 
         # TODO: rating
         # from . import safety_checker
@@ -172,3 +170,13 @@ class SDXLTiledImg2ImgPipeline(SDXLImg2ImgPipeline):
 
         return init_latents, None
 
+from io_collector.calib_data_collector_controlnet import UNetWrapper
+class SDXLTiledImg2ImgPipelineForCalib(SDXLTiledImg2ImgPipeline):
+    def __init__(self, config):
+        super().__init__(config)
+        if config.control_mode == 6:
+            setattr(config, "collection_strategy", 0)
+        else:
+            setattr(config, "collection_strategy", 3)
+        self.unet = UNetWrapper(config)
+        

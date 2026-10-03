@@ -17,12 +17,14 @@ class TextProcessing:
         profiler = prof.get("pipeline")
         profile_name = "text_encoder" if not is_uncond else "text_encoder_uncond"
         profiler.start_profile(profile_name)
-        prompt_embeds_1 = self.text_encoder.get_text_embeddings(prompt, auto_mem_free=False)
+        prompt_embeds_1 = self.text_encoder.get_text_embeddings(prompt, auto_mem_free=False, is_uncond=is_uncond)
         profiler.stop_profile(profile_name)
     
         profile_name = "text_encoder_2" if not is_uncond else "text_encoder_2_uncond"
         profiler.start_profile(profile_name)
-        pooled_prompt_embeds, prompt_embeds_2 = self.text_encoder_2.get_text_embeddings_2(prompt_2, auto_mem_free=False)
+        pooled_prompt_embeds, prompt_embeds_2 = self.text_encoder_2.get_text_embeddings_2(prompt_2,
+                                                                                          auto_mem_free=False,
+                                                                                          is_uncond=is_uncond)
         profiler.stop_profile(profile_name)
     
         prompt_embeds = np.concatenate([prompt_embeds_1, prompt_embeds_2], axis=-1)
@@ -32,12 +34,10 @@ class TextProcessing:
     def encode_text(self, prompt, prompt_2, negative_prompt, negative_prompt_2, config,
                     auto_mem_free=True, return_uncond=True):
         logger.info("Encoding text...")
-        prompt_embeds, pooled_prompt_embeds = self._encode_text(
-            prompt, prompt_2, is_uncond=False)
+        prompt_embeds, pooled_prompt_embeds = self._encode_text(prompt, prompt_2, is_uncond=False)
         
         if config.cfg != 1 and return_uncond:
-            uncond_embeds, uncond_pooled_embeds = self._encode_text(
-                negative_prompt, negative_prompt_2, is_uncond=True)
+            uncond_embeds, uncond_pooled_embeds = self._encode_text(negative_prompt, negative_prompt_2, is_uncond=True)
         else:
             uncond_embeds, uncond_pooled_embeds = None, None
 

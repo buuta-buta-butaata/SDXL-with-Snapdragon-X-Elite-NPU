@@ -258,9 +258,12 @@ def split_into_tiles(src_image, tile_size=(1024, 1024), overlap_pixels=64):
     画像を、指定サイズ(1024x1024)でオーバーラップさせながらタイルに分割する関数
     """
     W, H = src_image.size
-    if W < tile_size[0] and H < tile_size[1]:
-        target_size = (tile_size[0], H * tile_size[0] // W) if W < H else (W * tile_size[1] // H, tile_size[1])
-        src_image = src_image.resize(target_size, resample=Image.Resampling.LANCZOS)
+    target_size = (W, H)
+    if W < tile_size[0] or H < tile_size[1]:
+        W, H = (tile_size[0], H * tile_size[0] // W) if W < H else (W * tile_size[1] // H, tile_size[1])
+        src_image = src_image.resize((W, H), resample=Image.Resampling.LANCZOS)
+        # 拡大したときは、ブラーをかけておく
+        src_image = src_image.filter(ImageFilter.GaussianBlur(radius=1))
 
     horizontal_tile_count = (W // (tile_size[0] - overlap_pixels)) + 1 if W != tile_size[0] else 1
     vertical_tile_count = (H // (tile_size[1] - overlap_pixels)) + 1 if H != tile_size[1] else 1
@@ -289,7 +292,7 @@ def split_into_tiles(src_image, tile_size=(1024, 1024), overlap_pixels=64):
         # 画像オブジェクトと、元の位置（x, y座標）をペアにして保持
         tiles_info.append((z_index, tile_img, (x, y)))
 
-    return tiles_info
+    return tiles_info, (W, H)
 
 
 def create_blend_mask(size=(1024, 1024), fade_pixels=64,

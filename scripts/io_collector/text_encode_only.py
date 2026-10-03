@@ -37,10 +37,14 @@ class SDXLPipelineTextOnly(BasePipeline):
         
 
     def run(self):
-        text_processing = TextProcessing(self.config.dirs["text_encoder_dir"],
-                                         self.config.dirs["tokenizer_dir"],
-                                         self.config.dirs["text_encoder_2_dir"],
-                                         self.config.dirs["tokenizer_2_dir"])
+        # text_processing = TextProcessing(self.config.dirs["text_encoder_dir"],
+        #                                  self.config.dirs["tokenizer_dir"],
+        #                                  self.config.dirs["text_encoder_2_dir"],
+        #                                  self.config.dirs["tokenizer_2_dir"])
+        text_processing = TextProcessingWrapper(self.config.dirs["text_encoder_dir"],
+                                                self.config.dirs["tokenizer_dir"],
+                                                self.config.dirs["text_encoder_2_dir"],
+                                                self.config.dirs["tokenizer_2_dir"])
 
         output_dir = self.config.output_dir
         os.makedirs(output_dir, exist_ok=True)
@@ -63,4 +67,39 @@ if __name__ == "__main__":
     conf = SimpleNamespace(prompt = "A beautiful cyberpunk city, high resolution, 8k, neon lights, highly detailed")
     main = SDXLPipelineTextOnly(conf)
     main.run();
+
+from sdxl_pipeline.text_encoder import TextEncoder
+from sdxl_pipeline.text_encoder_2 import TextEncoder2
+from sdxl_pipeline.text_processing import TextProcessing
+
+class TextProcessingWrapper(TextProcessing):
+    def __init__(self, text_encoder_dir, tokenizer_dir, text_encoder_2_dir, tokenizer_2_dir, use_torch=False):
+        self.text_encoder = TextEncoderWrapper(text_encoder_dir, tokenizer_dir, use_torch)
+        self.text_encoder_2 = TextEncoder2Wrapper(text_encoder_2_dir, tokenizer_2_dir, use_torch)
+
+class TextEncoderWrapper(TextEncoder):
+    def get_tokens(self, prompt, auto_mem_free, is_uncond=False):
+        tokens = super().get_tokens(prompt, auto_mem_free)
+
+        if not is_uncond:
+            from io_collector import numpy_io as npio
+            name = "text_encoder"
+            output_dir = rf"../calibration_data/{name}"
+            os.makedirs(output_dir, exist_ok=True)
+            npio.save(output_dir, name, tokens)
+
+        return tokens
+
+class TextEncoder2Wrapper(TextEncoder2):
+    def get_tokens(self, prompt, auto_mem_free, is_uncond=False):
+        tokens = super().get_tokens(prompt, auto_mem_free)
+
+        if not is_uncond:
+            from io_collector import numpy_io as npio
+            name = "text_encoder_2"
+            output_dir = rf"../calibration_data/{name}"
+            os.makedirs(output_dir, exist_ok=True)
+            npio.save(output_dir, name, tokens)
+
+        return tokens
 
