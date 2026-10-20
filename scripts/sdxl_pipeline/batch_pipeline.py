@@ -24,21 +24,26 @@ class SDXLBatchPipeline(SDXLPipeline):
         self.unet = UNet(self.config)
         self.vae_decoder = VAEDecoder(self.config)
 
+        self.prompt_list = []
+
     def set_text_processing_config(self, config, line, lineno):
         config.prompt = line
         config.prompt_2 = line
+        self.prompt_list.append(line)
 
     def set_unet_config(self, config, lineno):
         pass
 
     def set_vae_decoder_config(self, config, lineno):
-        pass
+        config.prompt = self.prompt_list[(lineno - 1) // self.config.batch_count]
+        config.prompt_2 = self.prompt_list[(lineno -1) // self.config.batch_count]
     
     def run(self):
         print("Running txt2img (batch mode)...")
         text_embeds_list = []
         if not os.path.isfile(self.config.input_file):
             text_embeds_list.append(self._run_text_processing())
+            self.set_text_processing_config(self.config, self.config.prompt, 1)
         else:
             lineno = 1
             with open(self.config.input_file) as f:
