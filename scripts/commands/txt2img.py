@@ -153,6 +153,11 @@ class Txt2ImgCommand(BaseCLICommand):
             action="store_true",
             help="Force PyTorch for tokenizer and scheduler (defaults to lightweight ONNX/NumPy processing)."
         )
+        model_group.add_argument(
+            "--use_legacy_model",
+            action="store_true",
+            help="Use the legacy model."
+        )
 
         # Debug options
         debug_group = txt2img_parser.add_argument_group("Debug options")
@@ -301,6 +306,69 @@ class Txt2ImgCommand(BaseCLICommand):
             help="[Experimental]"
         )
 
+        # Adapters Options
+        adapters_group = txt2img_parser.add_argument_group("IP Adapter / T2I Adapter options")
+        # IP Adapter
+        adapters_group.add_argument(
+            "--ip_adapter_image",
+            type=str,
+            default=None,
+            metavar="FILE",
+            help="[Experimental]"
+        )
+        adapters_group.add_argument(
+            "--ip_adapter_weight",
+            type=float_range(0, 1),
+            default=0.7,
+            metavar="FLOAT",
+            help="[Experimental]"
+        )
+        adapters_group.add_argument(
+            "--ip_adapter_face_image",
+            type=str,
+            default=None,
+            metavar="FILE",
+            help="[Experimental]"
+        )
+        adapters_group.add_argument(
+            "--ip_adapter_face_weight",
+            type=float_range(0, 1),
+            default=0.7,
+            metavar="FLOAT",
+            help="[Experimental]"
+        )
+        # T2I Adapter
+        adapters_group.add_argument(
+            "--t2i_adapter_image",
+            type=str,
+            default=None,
+            metavar="FILE",
+            help="[Experimental]"
+        )
+        adapters_group.add_argument(
+            "--t2i_adapter_weight",
+            type=float_range(0, 1),
+            default=0.7,
+            metavar="FLOAT",
+            help="[Experimental]"
+        )
+        adapters_group.add_argument(
+            "--t2i_mode",
+            type=int_range(0, 7),
+            default=0,
+            metavar="INT(choose from 0-6)",
+            help=(
+                "[Experimental]\n"
+                "  0: None\n"
+                "  1: canny\n"
+                "  2: sketch\n"
+                "  3: lineart\n"
+                "  4: depth-midas\n"
+                "  5: depth-zoe\n"
+                "  6: openpose\n"
+            )
+        )
+        
     @staticmethod
     def register_subcommand(parser: ArgumentParser) -> None:
 
@@ -325,6 +393,7 @@ class Txt2ImgCommand(BaseCLICommand):
 
     def _validate_model_options(self, config):
         if config.weight_shared_model:
+            config.use_legacy_model = True
             if not config.quantized_model:
                 logger.warning("Weight-shared models currently consume about twice the model file size in RAM,"
                                "so only quantized versions are provided.\n"
@@ -343,6 +412,7 @@ class Txt2ImgCommand(BaseCLICommand):
         if config.layout == "P" or config.layout == "Portrait":
             config.width = 832
             config.height = 1216
+            config.use_legacy_model = True
             if not config.quantized_model:
                 logger.warning("Portrait dimensions are currently only supported by weight-shared models.\n"
                                "Please run with '--quantized_model --weight_shared_model'."
@@ -353,6 +423,7 @@ class Txt2ImgCommand(BaseCLICommand):
         elif config.layout == "L" or config.layout == "Landscape":
             config.width = 1344
             config.height = 768
+            config.use_legacy_model = True
             if not config.quantized_model:
                 logger.warning("Landscape dimensions are currently only supported by weight-shared models.\n"
                                "Please run with '--quantized_model --weight_shared_model'."
@@ -414,6 +485,12 @@ class Txt2ImgCommand(BaseCLICommand):
         dirs["vae_encoder_dir"] = rf"{MODEL_ROOT_DIR}\{name}\vae_encoder\{res_str}"
         dirs["tagger_dir"] = rf"{HELPERS_DIR}\wd-vit-tagger-v3-for-Snapdragon-X-Elite"
         dirs["output_dir"] = config.output_dir
+
+        dirs["image_encoder_dir"] = rf"{HELPERS_DIR}\ip-adapter-sdxl-for-Snapdragon-X-Elite\image_encoder"
+        dirs["ip_adapter_dir"] = rf"{HELPERS_DIR}\ip-adapter-sdxl-for-Snapdragon-X-Elite\ip_adapter_plus"
+        dirs["ip_adapter_face_dir"] = rf"{HELPERS_DIR}\ip-adapter-sdxl-for-Snapdragon-X-Elite\ip_adapter_plus_face"
+        dirs["t2i_adapter_dir"] = rf"{HELPERS_DIR}\t2i-adapter-sdxl-for-Snapdragon-X-Elite"
+
         os.makedirs(config.output_dir, exist_ok=True)
 
         config.dirs = dirs
@@ -448,6 +525,24 @@ class Txt2ImgCommand(BaseCLICommand):
             if not (required.is_controlnet_available(os.path.join(config.dirs["controlnet_dir"], "model.onnx"))):
                 logger.warning("ControlNet model not found.\n"
                                "Please run 'sdxlite-cli setup --controlnet'.")
+                exit()
+
+        return config
+
+    def _validate_ip_adapter(self, config):
+        if self.config.ip_adapter_image is not None or self.config.ip_adapter_face_image is not None:
+            if not (required.is_ip_adapter_available(os.path.join(config.dirs["ip_adapter_dir"], "model.onnx"))):
+                logger.warning("IP Adapter model not found.\n"
+                               "Please run 'sdxlite-cli setup --ip_adapter'.")
+                exit()
+
+        return config
+
+    def _validate_t2i_adapter(self, config):
+        if self.config.t2i_adapter_image is not None:
+            if not (required.is_t2i_adapter_available(os.path.join(config.dirs["t2i_adapter_dir"], "model.onnx"))):
+                logger.warning("T2I Adapter model not found.\n"
+                               "Please run 'sdxlite-cli setup --t2i_adapter'.")
                 exit()
 
         return config
@@ -508,6 +603,17 @@ class Txt2ImgCommand(BaseCLICommand):
         if self.config.use_controlnet:
             from sdxl_pipeline.unet_controlnet import UNetControlNet
             pipe.unet = UNetControlNet(self.config)
+
+        if (self.config.ip_adapter_image is not None or
+            self.config.ip_adapter_face_image is not None or
+            self.config.t2i_adapter_image is not None
+            ):
+            from sdxl_pipeline.unet_with_adapters import set_adapters
+            if pipe.unet is None:
+                from sdxl_pipeline.unet import UNet
+                pipe.unet = UNet(self.config)
+            set_adapters(pipe.unet, self.config)
+            
         pipe.run()
         
         

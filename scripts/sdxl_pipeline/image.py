@@ -381,7 +381,7 @@ def preprocess_tile_for_clip(tile_image, size=(224, 224)):
     """
     W, H = size
     # 1. リサイズ
-    resized = tile_image.resize((W, H), resample=Image.Resampling.BICUBIC)
+    resized = tile_image.resize((W, H), resample=Image.Resampling.NEAREST)
     resized_np = np.array(resized)
     
     # 2. float32に変換しつつ、0.0 〜 1.0 にスケーリング
@@ -397,7 +397,6 @@ def preprocess_tile_for_clip(tile_image, size=(224, 224)):
     # 4. 軸の入れ替え: (H, W, C) -> (C, H, W)
     # 5. バッチ次元の追加: (C, H, W) -> (1, C, H, W)
     input_tensor = np.expand_dims(np.transpose(normalized, (2, 0, 1)), axis=0)
-    input_tensor = cvtColor(input_tensor)
     
     # NPUのモデルが float16 を期待している場合は、ここで .astype(np.float16) にしてください
     return input_tensor.astype(np.float16)

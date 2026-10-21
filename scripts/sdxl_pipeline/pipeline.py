@@ -82,6 +82,7 @@ class SDXLPipeline(BasePipeline):
                                           uncond_embeds, uncond_pooled_embeds, executor)
         
         profiler.stop_profile("unet")
+        self.unet.free_memory()
         del self.unet
         del prompt_embeds, pooled_prompt_embeds
         if config.cfg != 1:

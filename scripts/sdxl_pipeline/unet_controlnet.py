@@ -13,6 +13,34 @@ class UNetControlNet(UNet):
     def __init__(self, config):
         super().__init__(config)
         self.init(config)
+        self.validate_compatibility(config)
+
+    def validate_compatibility(self, config):
+        if config.use_legacy_model:
+            self.adapter_dict = {
+                "conv2d": "down_block_res_0",
+                "add_2": "down_block_res_1",
+                "add_4": "down_block_res_2",
+                "conv2d_5": "down_block_res_3",
+                "add_13": "down_block_res_4",
+                "add_22": "down_block_res_5",
+                "conv2d_11": "down_block_res_6",
+                "add_55": "down_block_res_7",
+                "add_88": "down_block_res_8",
+            }
+        else:
+            self.adapter_dict = {
+                "conv2d": "down_block_res_0",
+                "add_10": "down_block_res_1",
+                "add_12": "down_block_res_2",
+                "add_13": "down_block_res_3",
+                "add_24": "down_block_res_4",
+                "add_36": "down_block_res_5",
+                "conv2d_11": "down_block_res_6",
+                "add_79": "down_block_res_7",
+                "add_123": "down_block_res_8",
+            }
+        
         
     def init(self, config):
         self.controlnet = ControlNet(config)
@@ -66,17 +94,6 @@ class UNetControlNet(UNet):
         noise_pred, is_uncond = super().forward(latents, timestep, base_inputs, encoder_hidden_states, step, is_uncond)
         return noise_pred, is_uncond
 
-    adapter_dict = {
-        "add_2": "down_block_res_0",
-        "add_4": "down_block_res_1",
-        "conv2d": "down_block_res_2",
-        "conv2d_5": "down_block_res_3",
-        "add_13": "down_block_res_4",
-        "add_22": "down_block_res_5",
-        "conv2d_11": "down_block_res_6",
-        "add_55": "down_block_res_7",
-        "add_88": "down_block_res_8",
-    }
     def run_part1(self, feed_down, is_uncond):
         skip_connections = super().run_part1(feed_down, is_uncond)
         if (not self.guess_mode or not is_uncond) and self.is_active_controlnet:
