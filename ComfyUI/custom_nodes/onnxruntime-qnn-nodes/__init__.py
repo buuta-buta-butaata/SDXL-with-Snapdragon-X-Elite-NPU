@@ -1,6 +1,7 @@
 from .qnn_base_path_node import QNNBasePathLoader
 from .qnn_fixed_latent_node import QNNFixedLatentGenerator
 from .qnn_unet_node import QNNUNetLoader
+from .qnn_legacy_unet_node import QNNLegacyUNetLoader
 from .qnn_text_encoder_node import QNNTextEncoderLoader
 from .qnn_vae_decoder_node import QNNVAELoader
 
@@ -8,6 +9,7 @@ NODE_CLASS_MAPPINGS = {
     "QNNBasePathLoader": QNNBasePathLoader,
     "QNNFixedLatentGenerator": QNNFixedLatentGenerator,
     "QNNUNetLoader": QNNUNetLoader,
+    "QNNLegacyUNetLoader": QNNLegacyUNetLoader,
     "QNNTextEncoderLoader": QNNTextEncoderLoader,
     "QNNVAELoader": QNNVAELoader
 }
@@ -16,6 +18,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "QNNBasePathLoader": "📁 QNN Model Base Path Specifier",
     "QNNFixedLatentGenerator": "🌟 QNN SDXL Latent Generator",
     "QNNUNetLoader": "🌟 QNN 5-Part UNet Loader",
+    "QNNLegacyUNetLoader": "🌟 QNN 5-Part Legacy UNet Loader",
     "QNNTextEncoderLoader": "🌟 QNN Text Encoder Loader",
     "QNNVAELoader": "🌟 QNN VAE Decoder Loader"
 }

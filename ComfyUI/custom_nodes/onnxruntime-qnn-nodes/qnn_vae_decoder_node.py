@@ -28,7 +28,7 @@ class QNNVAELoader:
 
     def load_vae(self, base_path):
         # 引き渡されたベースパスから、HF構造のVAE Decoderへのフルパスを生成
-        path_vae = os.path.join(base_path, "vae_decoder", "model.onnx")
+        path_vae = os.path.join(base_path, "vae_decoder", "1024x1024", "model.onnx")
         
         class QNNVAEWrapper:
             def decode(self, latent_tokens):

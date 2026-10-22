@@ -7,6 +7,7 @@ import folder_paths
 
 from . import qnn_ep_helper as qnn
 from . import common_utils as utils
+from . import adapter_helper as adapter
 # =====================================================================
 # 1. 5-Part UNet Loader & 推論ロジック
 # =====================================================================
@@ -46,12 +47,15 @@ class QNNUNetLoader:
             utils.clean_memory()
             
     def load_qnn_model(self, base_path):
+        fp16_model_dir = "unet"
+        quantized_model_dir = "unet_w8a16_quantized"
+        model_dir = quantized_model_dir
         paths = {
-            "part0": os.path.join(base_path, "unet", "part0", "model.onnx"),
-            "part1": os.path.join(base_path, "unet", "part1", "model.onnx"),
-            "part2": os.path.join(base_path, "unet", "part2", "model.onnx"),
-            "part3": os.path.join(base_path, "unet", "part3", "model.onnx"),
-            "part4": os.path.join(base_path, "unet", "part4", "model.onnx"),
+            "part0": os.path.join(base_path, model_dir, "part0", "model.onnx"),
+            "part1": os.path.join(base_path, model_dir, "part1", "model.onnx"),
+            "part2": os.path.join(base_path, model_dir, "part2", "model.onnx"),
+            "part3": os.path.join(base_path, model_dir, "part3", "model.onnx"),
+            "part4": os.path.join(base_path, model_dir, "part4", "model.onnx"),
         }
         
         for name, path in paths.items():
@@ -71,6 +75,10 @@ class QNNUNetLoader:
                 self.out_names_up1 = [x.name for x in self.sess_up1.get_outputs()]
                 self.out_names_up2 = [x.name for x in self.sess_up2.get_outputs()]
                 self.dtype = torch.float32
+                self.part1_main_output = "add_123"
+                self.part2_main_output = "add_168"
+                self.part3_main_output = "add_212"
+                self.adapter_data = adapter.get_uncond_data()
 
             def _load_models(self):
                 self.sess_common = ort.InferenceSession(paths["part0"], sess_options=qnn.session_options)
@@ -78,6 +86,12 @@ class QNNUNetLoader:
                 self.sess_mid = ort.InferenceSession(paths["part2"], sess_options=qnn.session_options)
                 self.sess_up1 = ort.InferenceSession(paths["part3"], sess_options=qnn.session_options)
                 self.sess_up2 = ort.InferenceSession(paths["part4"], sess_options=qnn.session_options)
+
+            def _sanitize_outputs(self, outputs, key, shape_3_size):
+                if outputs[key].shape[3] == shape_3_size:
+                    outputs[key] = outputs[key].transpose(0, 3, 1, 2)
+                if f"{key}_permute" in outputs:
+                    del outputs[f"{key}_permute"]
 
             def __call__(self, x, timesteps, context, *args, **kwargs):
                 """ComfyUI KSamplerメインループ（バッチサイズ自動分割対応版）"""
@@ -146,25 +160,28 @@ class QNNUNetLoader:
                     common_inputs = out_list_common[0].astype(np.float16)
                     
                     # 1. Part 1: Down
-                    feed_down = {"silu_3": common_inputs, "sample": latents_np, "encoder_hidden_states": encoder_np}
+                    feed_down = {"silu_3": common_inputs, "sample": latents_np, "encoder_hidden_states": encoder_np, **self.adapter_data["down"]}
                     out_list_down = self.sess_down.run(self.out_names_down, feed_down)
                     skip_connections = dict(zip(self.out_names_down, out_list_down))
-                    skip_connections['add_88'] = skip_connections['add_88'].transpose(0, 3, 1, 2)
+                    self._sanitize_outputs(skip_connections, self.part1_main_output, 1280)
+                    # skip_connections[self.part1_main_output] = skip_connections[self.part1_main_output].transpose(0, 3, 1, 2)
                     
                     # 2. Part 2: Mid
-                    feed_mid = {"add_88": skip_connections["add_88"], "silu_3": common_inputs, "encoder_hidden_states": encoder_np}
+                    feed_mid = {self.part1_main_output: skip_connections[self.part1_main_output], "silu_3": common_inputs, "encoder_hidden_states": encoder_np, **self.adapter_data["mid"]}
                     out_list_mid = self.sess_mid.run(self.out_names_mid, feed_mid)
-                    add_123 = out_list_mid[0]
+                    part2_outputs = out_list_mid[0]
                     
                     # 3. Part 3: Up 前半
-                    feed_up1 = {"add_88": skip_connections["add_88"], "add_123": add_123, "silu_3": common_inputs, "encoder_hidden_states": encoder_np}
+                    feed_up1 = {self.part1_main_output: skip_connections[self.part1_main_output], self.part2_main_output: part2_outputs, "silu_3": common_inputs, "encoder_hidden_states": encoder_np, **self.adapter_data["up1"]}
                     out_list_up1 = self.sess_up1.run(self.out_names_up1, feed_up1)
-                    add_156 = out_list_up1[0].transpose(0, 3, 1, 2)
+                    up1_outputs = dict(zip(self.out_names_up1, out_list_up1))
+                    self._sanitize_outputs(up1_outputs, self.part3_main_output, 1280)
+                    part3_outputs = up1_outputs[self.part3_main_output]
                     
                     # 4. Part 4: Up 後半 + 最終Output
                     part4_inputs = skip_connections.copy()
-                    del part4_inputs["add_88"]
-                    feed_up2 = {"add_156": add_156, **part4_inputs, "silu_3": common_inputs, "encoder_hidden_states": encoder_np}
+                    del part4_inputs[self.part1_main_output]
+                    feed_up2 = {self.part3_main_output: part3_outputs, **part4_inputs, "silu_3": common_inputs, "encoder_hidden_states": encoder_np, **self.adapter_data["up2"]}
                     out_list_up2 = self.sess_up2.run(self.out_names_up2, feed_up2)
                     noise_pred = out_list_up2[0]
                     
@@ -179,7 +196,7 @@ class QNNUNetLoader:
                     output_tensors.append(out_single_tensor)
                     
                     # メモリの小まめなお掃除
-                    del latents_np, timestep_np, encoder_np, common_inputs, skip_connections, add_123, add_156, noise_pred
+                    del latents_np, timestep_np, encoder_np, common_inputs, skip_connections, part2_outputs, part3_outputs, noise_pred
                     utils.clean_memory()
 
                 # ---- 最終合流処理 ----
