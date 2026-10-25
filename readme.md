@@ -6,13 +6,12 @@ The initial goal of this project was to run Stable Diffusion XL (SDXL) models na
 Having successfully proven the core concept, this project has transitioned from a mere Proof of Concept (PoC) to a production-focused utility. Current development shifts toward maximizing practicality—focusing on memory efficiency, workflow optimizations, and delivering a fast, standalone experience for daily image generation on ARM64 Windows hardware.
 
 
-## Current Status (As of September 2026)
+## Current Status (As of October 2026)
 
-### [WIP] Image-to-Image
-**[Image-to-Image](img2img.md)**
-
-### [WIP] ControlNet
-**[ControlNet](controlnet.md)**
+### Work in progress
+* **[IP Adapter/T2I Adapter](ip_adapter.md)**
+* **[Image-to-Image](img2img.md)**
+* **[ControlNet](controlnet.md)**
 
 ### 🚀 Running FP16 Models (Fully Operational)
 * **Performance (6 steps)**: ~3.92 s/it (Total time: ~34.7 seconds)
@@ -178,7 +177,7 @@ sdxlite-cli txt2img --prompt "A very soft and faded pastel watercolor illustrati
 sdxlite-cli txt2img --input_file "sample_prompts.txt" --quantized_model
 ```
 
-##### 5. Ultra-Fast Generation (CFG 1.0 Tuning)
+##### 5. Fast Generation (CFG 1.0 Tuning)
 Setting the Guidance Scale to `--cfg 1` minimizes inference overhead for maximum speed. However, with default settings, CFG 1.0 often results in undersaturated, washed-out images (even if you explicitly include keywords like "vivid colors" in your prompt). 
 
 To counteract this and maintain vibrant image quality at ultra-high speeds, we recommend either of the following advanced configurations:
@@ -195,6 +194,9 @@ sdxlite-cli txt2img --prompt "anime illustration, robot, vivid color" --quantize
 sdxlite-cli txt2img --prompt "anime illustration, robot, vivid color" --quantized_model --cfg 1 --scheduler 2
 ```
 
+<details>
+
+<summary>Technical Architecture</summary>
 
 ## Technical Architecture: How It Works
 
@@ -243,6 +245,7 @@ Once execution finishes, a `split_models` directory will be generated containing
 
 ⚠️ *Note: The final pre-compilation step requires uploading the models to Qualcomm's cloud compilation servers. To prevent unnecessary server load and respect API guidelines, the automated compilation hooks in these scripts have been safely commented out or removed.*
 
+</details>
 
 ## Known Issues
 
