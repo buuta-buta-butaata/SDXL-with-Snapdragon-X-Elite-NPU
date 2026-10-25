@@ -2,9 +2,7 @@
 
 [Experimental] Run SDXL img2img pipeline on NPU.
 
-## Running the Image-to-Image Generation
-
-### Execution Examples
+## Execution Examples
 
 **Input:**  
 <img src="images/white_tiger.png" width="50%" />
@@ -21,7 +19,7 @@ sdxlite-cli.bat img2img --quantized_model --prompt "lion" --input_image "white_t
 
 ---
 
-#### Inpaint
+### Inpaint
 
 **Input:**  
 <img src="images/white_tiger.png" width="50%" />  
@@ -34,14 +32,14 @@ sdxlite-cli.bat img2img --quantized_model --input_image "white_tiger.png" --mask
 **Output:**  
 <img src="images/output_sdxl_npu_20260907225138.png" width="50%" />
 
-##### Key parameters
+#### Key parameters
 ```
 --denoising_strength 0.8-0.99
 ```
 
 ---
 
-#### Outpaint
+### Outpaint
 
 **Input:**  
 <img src="images/white_tiger.png" width="50%" />
@@ -51,7 +49,7 @@ sdxlite-cli.bat img2img --quantized_model --input_image "white_tiger.png" --prom
 **Output:**  
 <img src="images/output_sdxl_npu_20260908004414.png" width="50%" />
 
-##### Key parameters
+#### Key parameters
 ```
 --outpaint_direction bottom or top or left or right
 --denoising_strength 0.8-0.99
@@ -60,7 +58,7 @@ sdxlite-cli.bat img2img --quantized_model --input_image "white_tiger.png" --prom
 
 ---
 
-#### hires_fix
+### hires_fix
 **Input:**  
 <img src="images/white_tiger.png" width="50%" />
 ```bash
@@ -69,7 +67,7 @@ sdxlite-cli.bat img2img --quantized_model --prompt "white tiger" --input_image "
 **Output:**  
 <img src="images/output_sdxl_npu_20260907231224.png" width="100%" />
 
-##### Key parameters
+#### Key parameters
 ```
 --hires_fix
 ```

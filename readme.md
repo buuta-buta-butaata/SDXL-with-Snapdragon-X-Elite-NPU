@@ -9,9 +9,10 @@ Having successfully proven the core concept, this project has transitioned from 
 ## Current Status (As of October 2026)
 
 ### Work in progress
-* **[IP Adapter/T2I Adapter](ip_adapter.md)**
-* **[Image-to-Image](img2img.md)**
-* **[ControlNet](controlnet.md)**
+* 👉 **[Image-to-Image](img2img.md)**
+* 👉 **[ControlNet on Snapdragon X Elite](controlnet.md)**
+* 👉 **[IP Adapter/IP Adapter Face on Snapdragon X Elite](ip_adapter.md)**  **NEW!**
+* **T2I Adapter on Snapdragon X Elite** **NEW!**
 
 ### 🚀 Running FP16 Models (Fully Operational)
 * **Performance (6 steps)**: ~3.92 s/it (Total time: ~34.7 seconds)
