@@ -1,3 +1,4 @@
+import copy
 import numpy as np
 
 uncond_down = dict(
@@ -153,9 +154,9 @@ uncond_up2 = dict(
 )
 
 def get_uncond_data():
-    return {
+    return copy.deepcopy({
         "down": uncond_down,
         "mid": uncond_mid,
         "up1": uncond_up1,
         "up2": uncond_up2,
-    }
+    })

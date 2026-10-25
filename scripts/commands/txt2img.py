@@ -319,7 +319,7 @@ class Txt2ImgCommand(BaseCLICommand):
         adapters_group.add_argument(
             "--ip_adapter_weight",
             type=float_range(0, 1),
-            default=0.7,
+            default=0.6,
             metavar="FLOAT",
             help="[Experimental]"
         )
@@ -333,7 +333,7 @@ class Txt2ImgCommand(BaseCLICommand):
         adapters_group.add_argument(
             "--ip_adapter_face_weight",
             type=float_range(0, 1),
-            default=0.7,
+            default=0.6,
             metavar="FLOAT",
             help="[Experimental]"
         )
@@ -348,7 +348,7 @@ class Txt2ImgCommand(BaseCLICommand):
         adapters_group.add_argument(
             "--t2i_adapter_weight",
             type=float_range(0, 1),
-            default=0.7,
+            default=0.6,
             metavar="FLOAT",
             help="[Experimental]"
         )

@@ -1,7 +1,8 @@
+import copy
 import numpy as np
 
 def get_uncond_data():
-    return {
+    return copy.deepcopy({
         "down":
         {
             "t2i_adapter_state_1": np.zeros((1, 320, 64, 64), np.float16),
@@ -12,4 +13,4 @@ def get_uncond_data():
         {
             "t2i_adapter_state_4": np.zeros((1, 1280, 32, 32), np.float16),
         }
-    }
+    })

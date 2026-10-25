@@ -24,21 +24,28 @@ class CalibrationDataCollector(SDXLBatchPipeline):
         self.config_list = []
 
     def set_text_processing_config(self, config, line, lineno):
-        prompt, etc = line.split("\",")
+        prompt, int_etc, str_etc = line.split("/////")
         if prompt[0] == "\"":
             prompt = prompt[1:]
 
         config.prompt = prompt
         config.prompt_2 = config.prompt
-        self.config_list.append([prompt] + [int(x) for x in etc.split(",")])
+        self.config_list.append([prompt] + [int(x) for x in int_etc.split(",")]
+                                + [x if len(x) > 0 else None for x in str_etc.split(",")])
 
     def set_unet_config(self, config, lineno):
-        _, config.step, config.scheduler_type, config.seed, config.collection_strategy = self.config_list[lineno-1]
+        (_, config.step, config.scheduler_type, config.seed, config.collection_strategy, config.t2i_mode,
+         config.ip_adapter_image, config.ip_adapter_face_image,
+         config.t2i_adapter_image) = self.config_list[lineno-1]
         config.current_num = lineno
+        from sdxl_pipeline.unet_with_adapters import set_adapters
+        set_adapters(self.unet, config)
 
     def set_vae_decoder_config(self, config, lineno):
         (config.prompt, config.step, config.scheduler_type,
-         config.seed, config.collection_strategy) = self.config_list[lineno-1]
+         config.seed, config.collection_strategy, config.t2i_mode,
+         config.ip_adapter_image, config.ip_adapter_face_image,
+         config.t2i_adapter_image) = self.config_list[lineno-1]
         config.prompt_2 = config.prompt
     
 

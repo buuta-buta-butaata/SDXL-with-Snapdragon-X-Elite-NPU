@@ -17,10 +17,12 @@ logger = logging.getLogger(__name__)
 def set_adapters(unet, config):
     if config.t2i_adapter_image is not None:
         unet.run_t2i_adapter = run_t2i_adapter
-    if config.ip_adapter_image is not None:
+    if config.ip_adapter_image is not None or config.ip_adapter_face_image is not None:
         unet.run_ip_adapter = run_ip_adapter
 
 def run_t2i_adapter(config):
+    if config.t2i_adapter_image is None:
+        return t2i_helper.get_uncond_data(), t2i_helper.get_uncond_data()
     src_image = Image.open(config.t2i_adapter_image).convert("RGB")
 
     t2i_adapter = T2IAdapter(config)
@@ -63,14 +65,14 @@ def run_ip_adapter(config):
     if config.ip_adapter_image is not None:
         ip_adapter = IPAdapter(config)
         ip_outputs = _run_ip_adapter(img_enc, ip_adapter, config, config.ip_adapter_image, config.ip_adapter_weight)
-        for x in outputs.keys():
+        for x in ip_outputs.keys():
             outputs[x] = ip_outputs[x]
 
     if config.ip_adapter_face_image is not None:
         ip_adapter_face = IPAdapterFace(config)
         ip_outputs = _run_ip_adapter(img_enc, ip_adapter_face, config, config.ip_adapter_face_image, config.ip_adapter_face_weight)
-        for x in outputs.keys():
-            for y in outputs[x].keys():
+        for x in ip_outputs.keys():
+            for y in ip_outputs[x].keys():
                 outputs[x][y] += ip_outputs[x][y]
 
     del img_enc
